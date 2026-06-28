@@ -73,8 +73,8 @@ No paper layer. Dye displayed raw to verify sim correctness.
 - [x] Vite + TypeScript project init (`npm create vite@latest flux -- --template vanilla-ts`)
 - [x] Install dependencies: `vite-plugin-glsl`, `vitest`, `playwright`, `pixelmatch`
 - [x] `vite.config.ts` with glsl plugin configured
-- [ ] `src/sim/config.ts` — all tuning parameters (resolution, jacobiIterations, viscosity, splatRadius, dt, force)
-- [ ] Mobile detection in config (maxTouchPoints + screen size heuristic)
+- [x] `src/sim/config.ts` — all tuning parameters (resolution, jacobiIterations, viscosity, splatRadius, dt, force)
+- [x] Mobile detection in config (maxTouchPoints + screen size heuristic)
 
 ### WebGL Infrastructure
 - [ ] `src/main.ts` — canvas init, DPR-correct sizing, init call
@@ -214,7 +214,7 @@ Synthesized from eng review findings. Each task derives from a specific finding.
   - Files: `package.json`, `vite.config.ts`, `index.html`
   - Verify: `npm run dev` serves page, `npm run build` succeeds
 
-- [ ] **T2 (P1, human: ~30min / CC: ~5min)** — Config — Create `src/sim/config.ts` with all tuning params + mobile detection
+- [x] **T2 (P1, human: ~30min / CC: ~5min)** — Config — Create `src/sim/config.ts` with all tuning params + mobile detection
   - Surfaced by: Code quality D6+D10 — scatter vs single-source for 200+ tuning iterations
   - Files: `src/sim/config.ts`
   - Verify: Mobile params activate on simulated mobile viewport
