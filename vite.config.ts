@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import glsl from 'vite-plugin-glsl';
 
 export default defineConfig({
@@ -10,5 +10,9 @@ export default defineConfig({
   ],
   build: {
     target: 'es2020',
+  },
+  test: {
+    environment: 'jsdom',
+    include: ['tests/unit/**/*.test.ts'],
   },
 });

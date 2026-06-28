@@ -1,5 +1,6 @@
 import { getConfig, isMobile } from './sim/config';
 import { initDevOverlay, tickFPS } from './dev/DevOverlay';
+import { isHeadless, REPLAY_SEQUENCE, REPLAY_TOTAL_FRAMES } from './sim/headless';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
@@ -75,6 +76,26 @@ async function init(): Promise<void> {
   }
 
   sim.init();
+
+  if (isHeadless()) {
+    // Deterministic replay for Playwright visual regression (D8/D11)
+    let frameCount = 0;
+    function headlessFrame(): void {
+      for (const s of REPLAY_SEQUENCE) {
+        if (s.frame === frameCount) sim.addSplat(s);
+      }
+      sim.step(1000 / 60);
+      sim.render();
+      frameCount++;
+      if (frameCount < REPLAY_TOTAL_FRAMES) {
+        requestAnimationFrame(headlessFrame);
+      } else {
+        document.documentElement.dataset['simReady'] = 'true';
+      }
+    }
+    requestAnimationFrame(headlessFrame);
+    return;
+  }
 
   let lastTime = 0;
   function frame(now: number): void {

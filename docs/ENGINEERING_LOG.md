@@ -23,7 +23,21 @@
 - Vite 8 + TypeScript, vite-plugin-glsl, vitest, playwright scaffolded
 - SimConfig with desktop/mobile tuning params and isMobile() detection
 
-### Next
-- T19: Playwright deterministic replay test (SIM_HEADLESS URL param, pixelmatch)
-- T20: Vitest unit tests (coord normalization, isMobile, config loading)
-- Browser verification: open http://localhost:5174/, drag mouse, confirm ink flows on cream canvas
+### [pending commit] — feat(T19-T20): add Playwright visual regression + Vitest unit tests
+- `src/sim/headless.ts` (NEW): `REPLAY_SEQUENCE` (two deterministic strokes), `REPLAY_TOTAL_FRAMES=60`, `isHeadless()`
+- `src/main.ts`: headless branch — when `?SIM_HEADLESS=true`, runs fixed replay then sets `html[data-sim-ready]`
+- `playwright.config.ts` (NEW): Chromium, 1280×720, reuses existing dev server
+- `tests/e2e/fluid.spec.ts` (NEW): waits for `data-sim-ready`, screenshots with threshold 0.1 + maxDiffPixelRatio 0.02
+- `tests/unit/config.test.ts` (NEW): 8 tests — isMobile() boundary cases + getConfig() desktop/mobile branches
+- `tests/unit/inputHandler.test.ts` (NEW): 6 tests — normalize() center/corners/offset/Y-flip
+- `vite.config.ts`: switched to `vitest/config`, added `test: { environment: 'jsdom' }`
+- Added `jsdom` + `@types/jsdom` as devDependencies (Vitest v4 peer dep)
+
+Results: 14 Vitest unit tests pass, Playwright baseline generated + regression passes.
+
+Phase 1 browser verification (2026-06-28):
+- 280fps at 512×512 desktop (target: 60fps) ✓
+- Ink flows on cream canvas, smooth advection ✓
+- Canvas resize: no corruption ✓
+- Tab switch: pause/resume correct ✓
+- Playwright regression: 1/1 passing ✓

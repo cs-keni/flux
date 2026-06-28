@@ -115,20 +115,20 @@ No paper layer. Dye displayed raw to verify sim correctness.
 - [x] FPS overlay: press F in dev mode to show FPS / sim resolution / Jacobi count
 
 ### Tests
-- [ ] Vitest: coordinate normalization math in InputHandler
-- [ ] Playwright: deterministic replay mode (`SIM_HEADLESS=true` URL param, JSON pointer sequence, fixed dt)
+- [x] Vitest: coordinate normalization math in InputHandler
+- [x] Playwright: deterministic replay mode (`SIM_HEADLESS=true` URL param, JSON pointer sequence, fixed dt)
 - [ ] Performance baseline: headless FPS benchmark script (60 frames, report avg)
 
 ### Phase 1 Success Criteria (all must pass before marking Phase 1 complete)
-- [ ] 60fps on MacBook Air M-series at 512×512 sim resolution
+- [x] 60fps on MacBook Air M-series at 512×512 sim resolution (verified: 280fps)
 - [ ] 30fps on mobile at 256×256 sim resolution
-- [ ] Dye advects smoothly — no hard pixel edges, no numerical blow-up
-- [ ] Ink bleeds and diffuses, velocity field decays correctly
+- [x] Dye advects smoothly — no hard pixel edges, no numerical blow-up
+- [x] Ink bleeds and diffuses, velocity field decays correctly
 - [ ] No memory leaks over 10 minutes (Chrome DevTools heap snapshot)
-- [ ] Canvas resize during active paint → no corruption
-- [ ] Tab switch → loop pauses, resumes correctly
+- [x] Canvas resize during active paint → no corruption
+- [x] Tab switch → loop pauses, resumes correctly
 - [ ] GPU reset simulation (via WEBGL_lose_context.loseContext()) → sim reinitializes
-- [ ] Playwright visual regression test passes
+- [x] Playwright visual regression test passes
 
 ---
 
@@ -299,12 +299,12 @@ Synthesized from eng review findings. Each task derives from a specific finding.
   - Files: `src/main.ts` (or `src/dev/DevOverlay.ts`)
   - Verify: Introduce typo in .glsl → red overlay appears in dev, not in prod build
 
-- [ ] **T19 (P2, human: ~2h / CC: ~15min)** — Tests: Playwright — Deterministic replay mode (SIM_HEADLESS, JSON pointer, pixelmatch)
+- [x] **T19 (P2, human: ~2h / CC: ~15min)** — Tests: Playwright — Deterministic replay mode (SIM_HEADLESS, JSON pointer, pixelmatch)
   - Surfaced by: Cross-model D11 — GPU sims non-deterministic, need seeded input
   - Files: `tests/e2e/`, `playwright.config.ts`
   - Verify: Same input sequence → same screenshot ± pixelmatch threshold
 
-- [ ] **T20 (P2, human: ~1h / CC: ~10min)** — Tests: Vitest — Coordinate normalization, config loading, mobile detection unit tests
+- [x] **T20 (P2, human: ~1h / CC: ~10min)** — Tests: Vitest — Coordinate normalization, config loading, mobile detection unit tests
   - Surfaced by: Test review — unit-testable pure functions
   - Files: `tests/unit/`
   - Verify: `npm run test` passes
