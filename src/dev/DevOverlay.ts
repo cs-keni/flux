@@ -6,12 +6,10 @@ let fpsVisible = false;
 let frameTimes: number[] = [];
 
 export function initDevOverlay(config: { resolution: number; jacobiIterations: number }): void {
-  // Shader error overlay — shown by glUtils.ts on throw; this catches unhandled rejections
+  // Catch all unhandled rejections and show them — covers GLSL errors, extension failures, etc.
   window.addEventListener('unhandledrejection', (e) => {
     const msg = e.reason instanceof Error ? e.reason.message : String(e.reason);
-    if (msg.includes('compile failed') || msg.includes('link failed')) {
-      showErrorBanner(msg);
-    }
+    showErrorBanner(msg);
   });
 
   // FPS overlay
@@ -52,6 +50,6 @@ function showErrorBanner(msg: string): void {
     background:rgba(26,18,9,0.92);color:#F2EDD7;
     font:13px/1.6 monospace;padding:24px 32px;white-space:pre-wrap;
   `;
-  el.textContent = `[flux] GLSL error\n\n${msg}`;
+  el.textContent = `[flux] runtime error\n\n${msg}`;
   document.body.appendChild(el);
 }

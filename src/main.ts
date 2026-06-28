@@ -70,11 +70,11 @@ async function init(): Promise<void> {
     if (document.hidden) sim.pause(); else sim.resume();
   });
 
-  sim.init();
-
   if (import.meta.env.DEV) {
     initDevOverlay(config);
   }
+
+  sim.init();
 
   let lastTime = 0;
   function frame(now: number): void {

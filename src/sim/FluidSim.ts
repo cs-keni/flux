@@ -80,6 +80,11 @@ export class FluidSim {
   init(): void {
     const gl = this.gl;
 
+    // Required for rendering into RGBA16F / R16F FBOs in WebGL 2
+    if (!gl.getExtension('EXT_color_buffer_float')) {
+      throw new Error('EXT_color_buffer_float not available — RGBA16F FBOs cannot be rendered into on this device/browser.');
+    }
+
     // D9: check for linear filtering on half-float textures
     this.linearFiltering = !!gl.getExtension('OES_texture_float_linear');
 
