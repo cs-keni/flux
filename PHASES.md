@@ -77,42 +77,42 @@ No paper layer. Dye displayed raw to verify sim correctness.
 - [x] Mobile detection in config (maxTouchPoints + screen size heuristic)
 
 ### WebGL Infrastructure
-- [ ] `src/main.ts` — canvas init, DPR-correct sizing, init call
-- [ ] WebGL 2 context creation with no-WebGL-2 fallback message (styled, not blank page)
-- [ ] `src/sim/FBOManager.ts` — create/destroy FBOs (RGBA16F, R16F), framebuffer completeness check
-- [ ] WebGL context loss (`webglcontextlost`) + restore (`webglcontextrestored`) handlers
-- [ ] Canvas resize safety: `pendingResize` flag, applied at top of next rAF frame
-- [ ] Page lifecycle: `visibilitychange` → pause/resume rAF loop
+- [x] `src/main.ts` — canvas init, DPR-correct sizing, init call
+- [x] WebGL 2 context creation with no-WebGL-2 fallback message (styled, not blank page)
+- [x] `src/sim/FBOManager.ts` — create/destroy FBOs (RGBA16F, R16F), framebuffer completeness check
+- [x] WebGL context loss (`webglcontextlost`) + restore (`webglcontextrestored`) handlers
+- [x] Canvas resize safety: `pendingResize` flag, applied at top of next rAF frame
+- [x] Page lifecycle: `visibilitychange` → pause/resume rAF loop
 
 ### GLSL Shaders
-- [ ] `src/shaders/quad.vert.glsl` — shared fullscreen quad vertex shader
-- [ ] `src/shaders/splat.frag.glsl` — Gaussian splat, inject velocity + dye
-- [ ] `src/shaders/advect.frag.glsl` — semi-Lagrangian advection (shared for velocity + dye)
+- [x] `src/shaders/quad.vert.glsl` — shared fullscreen quad vertex shader
+- [x] `src/shaders/splat.frag.glsl` — Gaussian splat, inject velocity + dye
+- [x] `src/shaders/advect.frag.glsl` — semi-Lagrangian advection (shared for velocity + dye)
   - Manual bilinear fallback if OES_texture_float_linear absent (D9)
-- [ ] `src/shaders/diffuse.frag.glsl` — implicit diffusion Jacobi pass
-- [ ] `src/shaders/divergence.frag.glsl` — compute ∇·u
-- [ ] `src/shaders/pressure.frag.glsl` — Jacobi pressure solve
-- [ ] `src/shaders/gradient.frag.glsl` — gradient subtraction (u -= ∇p)
-- [ ] `src/shaders/boundary.frag.glsl` — no-slip boundary conditions
-- [ ] `src/shaders/render.frag.glsl` — Phase 1: raw dye blit to display (replaced in Phase 2)
+- [x] `src/shaders/diffuse.frag.glsl` — implicit diffusion Jacobi pass
+- [x] `src/shaders/divergence.frag.glsl` — compute ∇·u
+- [x] `src/shaders/pressure.frag.glsl` — Jacobi pressure solve
+- [x] `src/shaders/gradient.frag.glsl` — gradient subtraction (u -= ∇p)
+- [x] `src/shaders/boundary.frag.glsl` — no-slip boundary conditions
+- [x] `src/shaders/render.frag.glsl` — Phase 1: raw dye blit to display (replaced in Phase 2)
 
 ### Fluid Simulation
-- [ ] `src/sim/FluidSim.ts` — orchestrates GPU passes
+- [x] `src/sim/FluidSim.ts` — orchestrates GPU passes
   - Fixed dt=1/60, frame cap 100ms (D15)
   - OES_texture_float_linear extension check (D9)
   - ASCII pipeline diagram at top of class
   - Clean `init()` that can be called multiple times (required for context restore)
-- [ ] rAF loop with proper cleanup (cancel on context loss, restart on restore)
+- [x] rAF loop with proper cleanup (cancel on context loss, restart on restore)
 
 ### Input
-- [ ] `src/input/InputHandler.ts` — pointer events → normalized [0,1]² coords
+- [x] `src/input/InputHandler.ts` — pointer events → normalized [0,1]² coords
   - DPR-corrected coordinate math
   - Mouse up / pointer cancel → clear splat state
   - Touch support (single touch for Phase 1)
 
 ### Dev Tools
-- [ ] Dev shader error overlay: `gl.getShaderInfoLog()` + `gl.getProgramInfoLog()` visible in `import.meta.env.DEV`
-- [ ] FPS overlay: press F in dev mode to show FPS / sim resolution / Jacobi count
+- [x] Dev shader error overlay: `gl.getShaderInfoLog()` + `gl.getProgramInfoLog()` visible in `import.meta.env.DEV`
+- [x] FPS overlay: press F in dev mode to show FPS / sim resolution / Jacobi count
 
 ### Tests
 - [ ] Vitest: coordinate normalization math in InputHandler
@@ -219,82 +219,82 @@ Synthesized from eng review findings. Each task derives from a specific finding.
   - Files: `src/sim/config.ts`
   - Verify: Mobile params activate on simulated mobile viewport
 
-- [ ] **T3 (P1, human: ~1h / CC: ~10min)** — WebGL init — WebGL 2 context creation + styled no-WebGL-2 fallback message
+- [x] **T3 (P1, human: ~1h / CC: ~10min)** — WebGL init — WebGL 2 context creation + styled no-WebGL-2 fallback message
   - Surfaced by: Failure modes — critical gap: blank page on unsupported browser
   - Files: `src/main.ts`
   - Verify: Disable WebGL in Chrome flags → styled message appears
 
-- [ ] **T4 (P1, human: ~2h / CC: ~15min)** — FBOManager — Create/destroy RGBA16F + R16F FBOs with framebuffer completeness check
+- [x] **T4 (P1, human: ~2h / CC: ~15min)** — FBOManager — Create/destroy RGBA16F + R16F FBOs with framebuffer completeness check
   - Surfaced by: Architecture D2 — half-float, native WebGL 2, no extension
   - Files: `src/sim/FBOManager.ts`
   - Verify: `gl.checkFramebufferStatus()` returns FRAMEBUFFER_COMPLETE
 
-- [ ] **T5 (P1, human: ~1h / CC: ~10min)** — Context lifecycle — Context loss/restore + visibilitychange pause/resume
+- [x] **T5 (P1, human: ~1h / CC: ~10min)** — Context lifecycle — Context loss/restore + visibilitychange pause/resume
   - Surfaced by: Architecture D1 + Code quality D7 — iOS GPU reset + background burn
   - Files: `src/main.ts`, `src/sim/FluidSim.ts`
   - Verify: `WEBGL_lose_context.loseContext()` → reinit → sim resumes
 
-- [ ] **T6 (P1, human: ~30min / CC: ~5min)** — Resize safety — `pendingResize` flag applied at top of next rAF frame
+- [x] **T6 (P1, human: ~30min / CC: ~5min)** — Resize safety — `pendingResize` flag applied at top of next rAF frame
   - Surfaced by: Failure modes — critical gap: FBO corruption on mid-frame resize
   - Files: `src/sim/FluidSim.ts`
   - Verify: Rapid window resize during active paint → no corruption
 
-- [ ] **T7 (P1, human: ~30min / CC: ~5min)** — Shaders: quad.vert — Shared fullscreen quad vertex shader
+- [x] **T7 (P1, human: ~30min / CC: ~5min)** — Shaders: quad.vert — Shared fullscreen quad vertex shader
   - Surfaced by: Architecture D3 — .glsl files with vite-plugin-glsl
   - Files: `src/shaders/quad.vert.glsl`
   - Verify: Imports cleanly in TypeScript, renders fullscreen quad
 
-- [ ] **T8 (P1, human: ~1h / CC: ~10min)** — Shaders: splat.frag — Gaussian splat, inject velocity + dye
+- [x] **T8 (P1, human: ~1h / CC: ~10min)** — Shaders: splat.frag — Gaussian splat, inject velocity + dye
   - Surfaced by: Phase 1 core sim
   - Files: `src/shaders/splat.frag.glsl`
   - Verify: Visible dye injected at pointer position
 
-- [ ] **T9 (P1, human: ~2h / CC: ~15min)** — Shaders: advect.frag — Semi-Lagrangian advection + manual bilinear fallback
+- [x] **T9 (P1, human: ~2h / CC: ~15min)** — Shaders: advect.frag — Semi-Lagrangian advection + manual bilinear fallback
   - Surfaced by: Performance D9 + D15 — bilinear correctness + fixed dt=1/60
   - Files: `src/shaders/advect.frag.glsl`
   - Verify: Dye advects smoothly, no hard pixel edges
 
-- [ ] **T10 (P1, human: ~1h / CC: ~10min)** — Shaders: diffuse.frag — Implicit diffusion Jacobi (~5 iterations at near-zero viscosity)
+- [x] **T10 (P1, human: ~1h / CC: ~10min)** — Shaders: diffuse.frag — Implicit diffusion Jacobi (~5 iterations at near-zero viscosity)
   - Surfaced by: Cross-model D13 — configurable viscosity, near-zero default for ink
   - Files: `src/shaders/diffuse.frag.glsl`
   - Verify: Ink diffuses slightly without going viscous
 
-- [ ] **T11 (P1, human: ~45min / CC: ~8min)** — Shaders: divergence.frag — Compute ∇·u
+- [x] **T11 (P1, human: ~45min / CC: ~8min)** — Shaders: divergence.frag — Compute ∇·u
   - Surfaced by: Phase 1 core sim (Stam's algorithm)
   - Files: `src/shaders/divergence.frag.glsl`
   - Verify: Divergence field is non-zero before pressure solve, near-zero after
 
-- [ ] **T12 (P1, human: ~1h / CC: ~10min)** — Shaders: pressure.frag — Jacobi pressure solve (40 desktop / 20 mobile)
+- [x] **T12 (P1, human: ~1h / CC: ~10min)** — Shaders: pressure.frag — Jacobi pressure solve (40 desktop / 20 mobile)
   - Surfaced by: Cross-model D12 — outside voice: 20 iterations doesn't converge on 512×512
   - Files: `src/shaders/pressure.frag.glsl`
   - Verify: Dye flows in divergence-free pattern (no visible compressibility artifacts)
 
-- [ ] **T13 (P1, human: ~45min / CC: ~8min)** — Shaders: gradient.frag — Gradient subtraction u -= ∇p
+- [x] **T13 (P1, human: ~45min / CC: ~8min)** — Shaders: gradient.frag — Gradient subtraction u -= ∇p
   - Surfaced by: Phase 1 core sim (Stam's algorithm)
   - Files: `src/shaders/gradient.frag.glsl`
   - Verify: Velocity field divergence-free after this pass
 
-- [ ] **T14 (P1, human: ~1h / CC: ~10min)** — Shaders: boundary.frag — No-slip boundary conditions at canvas edges
+- [x] **T14 (P1, human: ~1h / CC: ~10min)** — Shaders: boundary.frag — No-slip boundary conditions at canvas edges
   - Surfaced by: Code quality D5 — prevents velocity accumulation at edges
   - Files: `src/shaders/boundary.frag.glsl`
   - Verify: Ink doesn't pool permanently at canvas edges
 
-- [ ] **T15 (P1, human: ~30min / CC: ~5min)** — Shaders: render.frag — Phase 1 raw dye blit to display (replaced Phase 2)
+- [x] **T15 (P1, human: ~30min / CC: ~5min)** — Shaders: render.frag — Phase 1 raw dye blit to display (replaced Phase 2)
   - Surfaced by: Phase 1 design decision — validate sim before visual layer
   - Files: `src/shaders/render.frag.glsl`
   - Verify: Dye texture visible on canvas
 
-- [ ] **T16 (P1, human: ~3h / CC: ~20min)** — FluidSim — Orchestrate all 9 passes; fixed dt=1/60, 100ms cap; clean reinit(); ASCII diagram comment
+- [x] **T16 (P1, human: ~3h / CC: ~20min)** — FluidSim — Orchestrate all 9 passes; fixed dt=1/60, 100ms cap; clean reinit(); ASCII diagram comment
   - Surfaced by: Architecture D15 + D14 — fixed dt + clean init for context restore
   - Files: `src/sim/FluidSim.ts`
   - Verify: Full loop runs, all passes execute in correct order
 
-- [ ] **T17 (P1, human: ~1h / CC: ~10min)** — InputHandler — Pointer/touch → normalized [0,1]² DPR-corrected coords
+- [x] **T17 (P1, human: ~1h / CC: ~10min)** — InputHandler — Pointer/touch → normalized [0,1]² DPR-corrected coords
   - Surfaced by: Architecture D4 — correct coordinate math for high-DPI
   - Files: `src/input/InputHandler.ts`
   - Verify: Splat appears at cursor position on Retina display
 
-- [ ] **T18 (P1, human: ~1h / CC: ~10min)** — Dev tools — Shader error overlay (DEV mode) + FPS overlay (F key)
+- [x] **T18 (P1, human: ~1h / CC: ~10min)** — Dev tools — Shader error overlay (DEV mode) + FPS overlay (F key)
   - Surfaced by: Code quality — silent GLSL errors are 5-week development blocker
   - Files: `src/main.ts` (or `src/dev/DevOverlay.ts`)
   - Verify: Introduce typo in .glsl → red overlay appears in dev, not in prod build
