@@ -1,0 +1,327 @@
+# Flux — PHASES.md
+
+Engineering plan for Flux (Digital Sumi-e fluid simulation).
+Source of truth for what is built, what is deferred, and what decisions have been made.
+
+---
+
+## Architecture Decisions (locked)
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| D1 | WebGL context loss + restore in Phase 1 | iOS GPU resets are common; blank canvas is worse than added complexity |
+| D2 | RGBA16F / R16F for all FBOs | Native WebGL 2, no extension needed; 2× mobile fillrate vs RGBA32F |
+| D3 | .glsl files via vite-plugin-glsl | Syntax highlighting, linting, #include support for 8+ shaders |
+| D4 | Sim resolution decoupled from display canvas | Sim at 512×512, display at viewport × devicePixelRatio |
+| D5 | Boundary condition pass in Phase 1 | No-slip at canvas edges prevents velocity accumulation artifacts |
+| D6 | All tuning params in src/sim/config.ts | Single location for 200+ tuning iterations during development |
+| D7 | visibilitychange handler pauses rAF loop | Prevents background GPU burn; required for iOS context suspend behavior |
+| D8 | Playwright deterministic replay + FPS overlay | SIM_HEADLESS mode with fixed dt + JSON input sequence for screenshot determinism |
+| D9 | OES_texture_float_linear check + manual bilinear fallback | Correct bilinear advection on ~100% of devices; graceful on the ~2% without extension |
+| D10 | Mobile: maxTouchPoints > 0 && screen < 768 → res=256, jacobi=20 | No UA string parsing; DPR alone insufficient (Retina Macs) |
+| D11 | Deterministic replay mode for visual regression | Fixed dt=1/60, JSON pointer sequence, pixelmatch threshold 0.1 |
+| D12 | Starting Jacobi: 40 desktop / 20 mobile | 20 iterations on 512×512 doesn't converge; 40 is production floor at this resolution |
+| D13 | Diffusion Jacobi: configurable, default near-zero (0.0001) | Near-zero viscosity converges in <5 iterations; ink is not viscous |
+| D14 | Context loss kept in Phase 1 (vs. outside voice deferral recommendation) | Good architecture forced by reinit pattern benefits whole codebase |
+| D15 | Fixed dt = 1/60 with 100ms frame cap | Stability over temporal accuracy; advection backtrace bounded |
+
+---
+
+## Sim Pipeline (per frame)
+
+```
+Pointer/Touch Events
+       │
+       ▼
+  InputHandler (normalized [0,1]², DPR-corrected, fixed dt=1/60)
+       │
+       ▼
+  ┌─────────────────────────────────────────────────────┐
+  │                  Per-frame GPU passes                │
+  │                                                     │
+  │  1. SplatPass         inject velocity + dye         │
+  │  2. AdvectVelocity    semi-Lagrangian               │
+  │  3. DiffuseVelocity   Jacobi × N (default ~5)       │
+  │  4. Divergence        ∇·u                           │
+  │  5. PressureSolve     Jacobi × 40/20 (desk/mobile) │──┐
+  │  6. GradientSubtract  u -= ∇p                       │  │ ping-pong
+  │  7. BoundaryCondition no-slip at edges              │  │
+  │  8. AdvectDye         dye advects along u           │──┘
+  │  9. RenderDye         blit to display canvas        │
+  └─────────────────────────────────────────────────────┘
+       │
+       ▼
+  Canvas (CSS viewport size × devicePixelRatio)
+```
+
+**FBO layout:**
+```
+velocity_read / velocity_write  RGBA16F  [vx, vy, 0, 0]  — ping-pong
+dye_read / dye_write            RGBA16F  [r,  0,  0, 0]  — ping-pong
+divergence                      R16F     [∇·u]
+pressure_read / pressure_write  R16F     [p]             — Jacobi ping-pong
+```
+
+---
+
+## Phase 1 — Core Simulation (Weeks 1–5)
+
+**Goal:** Sim runs, dye advects realistically, 60fps on M-series, visual regression tests pass.
+No paper layer. Dye displayed raw to verify sim correctness.
+
+### Scaffolding
+- [ ] Vite + TypeScript project init (`npm create vite@latest flux -- --template vanilla-ts`)
+- [ ] Install dependencies: `vite-plugin-glsl`, `vitest`, `playwright`, `pixelmatch`
+- [ ] `vite.config.ts` with glsl plugin configured
+- [ ] `src/sim/config.ts` — all tuning parameters (resolution, jacobiIterations, viscosity, splatRadius, dt, force)
+- [ ] Mobile detection in config (maxTouchPoints + screen size heuristic)
+
+### WebGL Infrastructure
+- [ ] `src/main.ts` — canvas init, DPR-correct sizing, init call
+- [ ] WebGL 2 context creation with no-WebGL-2 fallback message (styled, not blank page)
+- [ ] `src/sim/FBOManager.ts` — create/destroy FBOs (RGBA16F, R16F), framebuffer completeness check
+- [ ] WebGL context loss (`webglcontextlost`) + restore (`webglcontextrestored`) handlers
+- [ ] Canvas resize safety: `pendingResize` flag, applied at top of next rAF frame
+- [ ] Page lifecycle: `visibilitychange` → pause/resume rAF loop
+
+### GLSL Shaders
+- [ ] `src/shaders/quad.vert.glsl` — shared fullscreen quad vertex shader
+- [ ] `src/shaders/splat.frag.glsl` — Gaussian splat, inject velocity + dye
+- [ ] `src/shaders/advect.frag.glsl` — semi-Lagrangian advection (shared for velocity + dye)
+  - Manual bilinear fallback if OES_texture_float_linear absent (D9)
+- [ ] `src/shaders/diffuse.frag.glsl` — implicit diffusion Jacobi pass
+- [ ] `src/shaders/divergence.frag.glsl` — compute ∇·u
+- [ ] `src/shaders/pressure.frag.glsl` — Jacobi pressure solve
+- [ ] `src/shaders/gradient.frag.glsl` — gradient subtraction (u -= ∇p)
+- [ ] `src/shaders/boundary.frag.glsl` — no-slip boundary conditions
+- [ ] `src/shaders/render.frag.glsl` — Phase 1: raw dye blit to display (replaced in Phase 2)
+
+### Fluid Simulation
+- [ ] `src/sim/FluidSim.ts` — orchestrates GPU passes
+  - Fixed dt=1/60, frame cap 100ms (D15)
+  - OES_texture_float_linear extension check (D9)
+  - ASCII pipeline diagram at top of class
+  - Clean `init()` that can be called multiple times (required for context restore)
+- [ ] rAF loop with proper cleanup (cancel on context loss, restart on restore)
+
+### Input
+- [ ] `src/input/InputHandler.ts` — pointer events → normalized [0,1]² coords
+  - DPR-corrected coordinate math
+  - Mouse up / pointer cancel → clear splat state
+  - Touch support (single touch for Phase 1)
+
+### Dev Tools
+- [ ] Dev shader error overlay: `gl.getShaderInfoLog()` + `gl.getProgramInfoLog()` visible in `import.meta.env.DEV`
+- [ ] FPS overlay: press F in dev mode to show FPS / sim resolution / Jacobi count
+
+### Tests
+- [ ] Vitest: coordinate normalization math in InputHandler
+- [ ] Playwright: deterministic replay mode (`SIM_HEADLESS=true` URL param, JSON pointer sequence, fixed dt)
+- [ ] Performance baseline: headless FPS benchmark script (60 frames, report avg)
+
+### Phase 1 Success Criteria (all must pass before marking Phase 1 complete)
+- [ ] 60fps on MacBook Air M-series at 512×512 sim resolution
+- [ ] 30fps on mobile at 256×256 sim resolution
+- [ ] Dye advects smoothly — no hard pixel edges, no numerical blow-up
+- [ ] Ink bleeds and diffuses, velocity field decays correctly
+- [ ] No memory leaks over 10 minutes (Chrome DevTools heap snapshot)
+- [ ] Canvas resize during active paint → no corruption
+- [ ] Tab switch → loop pauses, resumes correctly
+- [ ] GPU reset simulation (via WEBGL_lose_context.loseContext()) → sim reinitializes
+- [ ] Playwright visual regression test passes
+
+---
+
+## Phase 2 — The Visual Layer (Weeks 6–10)
+
+- [ ] Paper texture shader: FBM + Worley noise composite, warm #F2EDD7 color
+- [ ] Ink feather render pass: dye concentration → opacity curve
+- [ ] Ink-on-paper composite: ink over paper texture, multiplicative blend
+- [ ] Vignette pass
+- [ ] Palette system: Sumi (#1A1209), Indigo (#1B2A4A), Sepia (#3D2008)
+  - Selectable via keyboard only (no visible UI)
+  - Secondary hue that appears at thin ink edges
+- [ ] **Visual milestone:** screenshots should look like ink paintings
+
+---
+
+## Phase 3 — Polish and Depth (Weeks 11–18)
+
+- [ ] Edge feathering asymmetry: directional bias from velocity field
+- [ ] Wet-on-wet tuning: velocity injection for convincing stroke intersection bleed
+- [ ] Auto-pilot: first 3 choreographed sequences (branch, wave, character)
+- [ ] Save feature: PNG export with paper texture baked in
+- [ ] Idle detection: 8s → hint text, 30s → auto-pilot begins
+- [ ] Touch support: multi-touch for simultaneous strokes
+- [ ] High-DPI export: 2048×2048 PNG
+
+---
+
+## Phase 4 — Refinement (Weeks 19–28)
+
+- [ ] Auto-pilot: full 10 sequences (branch, mountain, bird, wave, character, + 5 more)
+- [ ] Resolution scaling: auto-detect device capability
+- [ ] "Ink dry" animation: 60s idle → ink subtly darkens (visual only)
+- [ ] Keyboard shortcuts: R=reset, S=save, P=palette cycle, 1/2/3=palette direct, A=autopilot
+- [ ] Optional ambient sound (paper scratch, off by default)
+
+---
+
+## Phase 5 — The Depth Layer (Months 6+)
+
+- [ ] WebGPU upgrade: compute shaders for 50+ Jacobi iterations
+  - Abstract solver behind `GpuBackend` interface now (TODOS.md item)
+- [ ] "Watercolor" material mode: lighter, more transparent, different feather curve
+- [ ] Gallery: last 5 sessions in localStorage
+- [ ] Shareable link: URL hash encodes auto-pilot sequence + palette
+
+---
+
+## NOT in scope (explicit deferrals)
+
+| Item | Rationale |
+|------|-----------|
+| Audio (default) | Silence is a design decision, not a deferred feature |
+| React/Vue/any framework | Canvas is the entire experience; framework overhead is noise |
+| UI chrome (toolbar, color picker, buttons) | Ruins the illusion. Keyboard-only interaction. |
+| Multi-color per session | Makes it look like a digital toy, not a painting instrument |
+| CI/CD pipeline | Out of scope until near Phase 3 |
+| Server-side anything | This is a pure frontend static app |
+
+---
+
+## Open Questions
+
+| Question | Status |
+|----------|--------|
+| Paper texture: procedural (GLSL FBM) vs scanned paper image? | Open — Phase 2 decision |
+| Auto-pilot idle delay: 30s desktop vs 60s mobile? | Open — Phase 3 decision |
+| Mobile sim resolution: 256×256 sufficient? | Open — needs real device validation in Phase 1 |
+
+---
+
+## TODOS (deferred, not forgotten)
+
+- [ ] **WebGPU abstraction layer** — Design a minimal `GpuBackend` interface (createBuffer, createProgram, runPass) so WebGPU can be swapped in without a full rewrite in Phase 5. Decision point: FBO concept maps to WebGPU render passes differently. Depends on: Phase 1 complete.
+
+---
+
+## Implementation Tasks
+Synthesized from eng review findings. Each task derives from a specific finding. Run with Claude Code or Codex; checkbox as you ship.
+
+- [ ] **T1 (P1, human: ~2h / CC: ~10min)** — Scaffold — Init Vite + TypeScript project with vite-plugin-glsl, vitest, playwright
+  - Surfaced by: Architecture review — greenfield project needs scaffold
+  - Files: `package.json`, `vite.config.ts`, `index.html`
+  - Verify: `npm run dev` serves page, `npm run build` succeeds
+
+- [ ] **T2 (P1, human: ~30min / CC: ~5min)** — Config — Create `src/sim/config.ts` with all tuning params + mobile detection
+  - Surfaced by: Code quality D6+D10 — scatter vs single-source for 200+ tuning iterations
+  - Files: `src/sim/config.ts`
+  - Verify: Mobile params activate on simulated mobile viewport
+
+- [ ] **T3 (P1, human: ~1h / CC: ~10min)** — WebGL init — WebGL 2 context creation + styled no-WebGL-2 fallback message
+  - Surfaced by: Failure modes — critical gap: blank page on unsupported browser
+  - Files: `src/main.ts`
+  - Verify: Disable WebGL in Chrome flags → styled message appears
+
+- [ ] **T4 (P1, human: ~2h / CC: ~15min)** — FBOManager — Create/destroy RGBA16F + R16F FBOs with framebuffer completeness check
+  - Surfaced by: Architecture D2 — half-float, native WebGL 2, no extension
+  - Files: `src/sim/FBOManager.ts`
+  - Verify: `gl.checkFramebufferStatus()` returns FRAMEBUFFER_COMPLETE
+
+- [ ] **T5 (P1, human: ~1h / CC: ~10min)** — Context lifecycle — Context loss/restore + visibilitychange pause/resume
+  - Surfaced by: Architecture D1 + Code quality D7 — iOS GPU reset + background burn
+  - Files: `src/main.ts`, `src/sim/FluidSim.ts`
+  - Verify: `WEBGL_lose_context.loseContext()` → reinit → sim resumes
+
+- [ ] **T6 (P1, human: ~30min / CC: ~5min)** — Resize safety — `pendingResize` flag applied at top of next rAF frame
+  - Surfaced by: Failure modes — critical gap: FBO corruption on mid-frame resize
+  - Files: `src/sim/FluidSim.ts`
+  - Verify: Rapid window resize during active paint → no corruption
+
+- [ ] **T7 (P1, human: ~30min / CC: ~5min)** — Shaders: quad.vert — Shared fullscreen quad vertex shader
+  - Surfaced by: Architecture D3 — .glsl files with vite-plugin-glsl
+  - Files: `src/shaders/quad.vert.glsl`
+  - Verify: Imports cleanly in TypeScript, renders fullscreen quad
+
+- [ ] **T8 (P1, human: ~1h / CC: ~10min)** — Shaders: splat.frag — Gaussian splat, inject velocity + dye
+  - Surfaced by: Phase 1 core sim
+  - Files: `src/shaders/splat.frag.glsl`
+  - Verify: Visible dye injected at pointer position
+
+- [ ] **T9 (P1, human: ~2h / CC: ~15min)** — Shaders: advect.frag — Semi-Lagrangian advection + manual bilinear fallback
+  - Surfaced by: Performance D9 + D15 — bilinear correctness + fixed dt=1/60
+  - Files: `src/shaders/advect.frag.glsl`
+  - Verify: Dye advects smoothly, no hard pixel edges
+
+- [ ] **T10 (P1, human: ~1h / CC: ~10min)** — Shaders: diffuse.frag — Implicit diffusion Jacobi (~5 iterations at near-zero viscosity)
+  - Surfaced by: Cross-model D13 — configurable viscosity, near-zero default for ink
+  - Files: `src/shaders/diffuse.frag.glsl`
+  - Verify: Ink diffuses slightly without going viscous
+
+- [ ] **T11 (P1, human: ~45min / CC: ~8min)** — Shaders: divergence.frag — Compute ∇·u
+  - Surfaced by: Phase 1 core sim (Stam's algorithm)
+  - Files: `src/shaders/divergence.frag.glsl`
+  - Verify: Divergence field is non-zero before pressure solve, near-zero after
+
+- [ ] **T12 (P1, human: ~1h / CC: ~10min)** — Shaders: pressure.frag — Jacobi pressure solve (40 desktop / 20 mobile)
+  - Surfaced by: Cross-model D12 — outside voice: 20 iterations doesn't converge on 512×512
+  - Files: `src/shaders/pressure.frag.glsl`
+  - Verify: Dye flows in divergence-free pattern (no visible compressibility artifacts)
+
+- [ ] **T13 (P1, human: ~45min / CC: ~8min)** — Shaders: gradient.frag — Gradient subtraction u -= ∇p
+  - Surfaced by: Phase 1 core sim (Stam's algorithm)
+  - Files: `src/shaders/gradient.frag.glsl`
+  - Verify: Velocity field divergence-free after this pass
+
+- [ ] **T14 (P1, human: ~1h / CC: ~10min)** — Shaders: boundary.frag — No-slip boundary conditions at canvas edges
+  - Surfaced by: Code quality D5 — prevents velocity accumulation at edges
+  - Files: `src/shaders/boundary.frag.glsl`
+  - Verify: Ink doesn't pool permanently at canvas edges
+
+- [ ] **T15 (P1, human: ~30min / CC: ~5min)** — Shaders: render.frag — Phase 1 raw dye blit to display (replaced Phase 2)
+  - Surfaced by: Phase 1 design decision — validate sim before visual layer
+  - Files: `src/shaders/render.frag.glsl`
+  - Verify: Dye texture visible on canvas
+
+- [ ] **T16 (P1, human: ~3h / CC: ~20min)** — FluidSim — Orchestrate all 9 passes; fixed dt=1/60, 100ms cap; clean reinit(); ASCII diagram comment
+  - Surfaced by: Architecture D15 + D14 — fixed dt + clean init for context restore
+  - Files: `src/sim/FluidSim.ts`
+  - Verify: Full loop runs, all passes execute in correct order
+
+- [ ] **T17 (P1, human: ~1h / CC: ~10min)** — InputHandler — Pointer/touch → normalized [0,1]² DPR-corrected coords
+  - Surfaced by: Architecture D4 — correct coordinate math for high-DPI
+  - Files: `src/input/InputHandler.ts`
+  - Verify: Splat appears at cursor position on Retina display
+
+- [ ] **T18 (P1, human: ~1h / CC: ~10min)** — Dev tools — Shader error overlay (DEV mode) + FPS overlay (F key)
+  - Surfaced by: Code quality — silent GLSL errors are 5-week development blocker
+  - Files: `src/main.ts` (or `src/dev/DevOverlay.ts`)
+  - Verify: Introduce typo in .glsl → red overlay appears in dev, not in prod build
+
+- [ ] **T19 (P2, human: ~2h / CC: ~15min)** — Tests: Playwright — Deterministic replay mode (SIM_HEADLESS, JSON pointer, pixelmatch)
+  - Surfaced by: Cross-model D11 — GPU sims non-deterministic, need seeded input
+  - Files: `tests/e2e/`, `playwright.config.ts`
+  - Verify: Same input sequence → same screenshot ± pixelmatch threshold
+
+- [ ] **T20 (P2, human: ~1h / CC: ~10min)** — Tests: Vitest — Coordinate normalization, config loading, mobile detection unit tests
+  - Surfaced by: Test review — unit-testable pure functions
+  - Files: `tests/unit/`
+  - Verify: `npm run test` passes
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 10 issues, 3 critical gaps resolved |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+**OUTSIDE VOICE:** Claude subagent ran. Found 5 real gaps (D11–D15) and 1 intentional design observation. All 5 incorporated into plan. No cross-model tension remaining.
+
+**VERDICT:** ENG CLEARED — ready to implement Phase 1.
+
+NO UNRESOLVED DECISIONS
+
