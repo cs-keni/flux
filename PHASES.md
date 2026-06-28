@@ -70,9 +70,9 @@ pressure_read / pressure_write  R16F     [p]             — Jacobi ping-pong
 No paper layer. Dye displayed raw to verify sim correctness.
 
 ### Scaffolding
-- [ ] Vite + TypeScript project init (`npm create vite@latest flux -- --template vanilla-ts`)
-- [ ] Install dependencies: `vite-plugin-glsl`, `vitest`, `playwright`, `pixelmatch`
-- [ ] `vite.config.ts` with glsl plugin configured
+- [x] Vite + TypeScript project init (`npm create vite@latest flux -- --template vanilla-ts`)
+- [x] Install dependencies: `vite-plugin-glsl`, `vitest`, `playwright`, `pixelmatch`
+- [x] `vite.config.ts` with glsl plugin configured
 - [ ] `src/sim/config.ts` — all tuning parameters (resolution, jacobiIterations, viscosity, splatRadius, dt, force)
 - [ ] Mobile detection in config (maxTouchPoints + screen size heuristic)
 
@@ -209,7 +209,7 @@ No paper layer. Dye displayed raw to verify sim correctness.
 ## Implementation Tasks
 Synthesized from eng review findings. Each task derives from a specific finding. Run with Claude Code or Codex; checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~2h / CC: ~10min)** — Scaffold — Init Vite + TypeScript project with vite-plugin-glsl, vitest, playwright
+- [x] **T1 (P1, human: ~2h / CC: ~10min)** — Scaffold — Init Vite + TypeScript project with vite-plugin-glsl, vitest, playwright
   - Surfaced by: Architecture review — greenfield project needs scaffold
   - Files: `package.json`, `vite.config.ts`, `index.html`
   - Verify: `npm run dev` serves page, `npm run build` succeeds

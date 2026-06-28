@@ -137,7 +137,7 @@ evidence says "this is a photo of a painting." The fact that it's running at
 2. Velocity advection
 3. Velocity diffusion
 4. Divergence computation
-5. Pressure solve (Jacobi, 20 iterations desktop / 10 mobile)
+5. Pressure solve (Jacobi, 40 iterations desktop / 20 mobile)
 6. Gradient subtraction (makes field divergence-free)
 7. Dye advection
 8. Render pass A: map dye concentration → ink opacity (feather curve)
