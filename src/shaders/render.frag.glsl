@@ -5,13 +5,94 @@ in vec2 v_uv;
 out vec4 fragColor;
 
 uniform sampler2D u_dye;
+uniform vec3 u_inkPrimary;    // ink color at full concentration
+uniform vec3 u_inkSecondary;  // edge bleed hue at thin ink margins
+
+// ── 2D hash noise ────────────────────────────────────────────────────────────
+
+float hash21(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+vec2 hash22(vec2 p) {
+  return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453123);
+}
+
+float valueNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f); // cubic smoothstep
+  return mix(
+    mix(hash21(i),                hash21(i + vec2(1.0, 0.0)), u.x),
+    mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x),
+    u.y
+  );
+}
+
+// 5-octave FBM with rotation to break axis alignment
+float fbm(vec2 p) {
+  float v = 0.0;
+  float a = 0.5;
+  // Small rotation breaks grid repetition while staying cheap
+  mat2 rot = mat2(0.8660, 0.5, -0.5, 0.8660); // 30°
+  for (int i = 0; i < 5; i++) {
+    v += a * valueNoise(p);
+    p = rot * p * 2.1 + vec2(5.2, 1.3);
+    a *= 0.5;
+  }
+  return v;
+}
+
+// Worley (cellular) noise — produces fibrous structure
+float worley(vec2 p) {
+  vec2 i = floor(p);
+  float minDist = 8.0;
+  for (int x = -1; x <= 1; x++) {
+    for (int y = -1; y <= 1; y++) {
+      vec2 cell = i + vec2(float(x), float(y));
+      vec2 pt = cell + hash22(cell); // jittered point inside cell
+      float d = length(pt - p);
+      minDist = min(minDist, d);
+    }
+  }
+  return minDist;
+}
 
 void main() {
-  // Phase 1: raw dye blit — validate sim correctness before visual layer
-  // Replaced in Phase 2 with ink-on-paper composite pass
-  float ink = texture(u_dye, v_uv).r;
-  // Map dye concentration to dark ink on warm paper
-  vec3 paper = vec3(0.949, 0.929, 0.843);  // #F2EDD7
-  vec3 inkColor = vec3(0.102, 0.071, 0.035); // #1A1209 sumi
-  fragColor = vec4(mix(paper, inkColor, clamp(ink, 0.0, 1.0)), 1.0);
+  // ── Paper texture ─────────────────────────────────────────────────────────
+  // High-frequency FBM + subtle Worley fiber. Scale chosen so grain reads at
+  // 512×512 display but disappears at a glance (you notice it on close look).
+  float grain  = fbm(v_uv * 580.0);
+  float fiber  = 1.0 - clamp(worley(v_uv * 30.0), 0.0, 1.0);
+  float noise  = grain * 0.78 + fiber * 0.22;
+
+  // ±2.8% luminance variation around the base paper color
+  vec3 paperBase  = vec3(0.949, 0.929, 0.843); // #F2EDD7
+  vec3 paperColor = paperBase + (noise - 0.5) * 0.056;
+
+  // ── Ink concentration → opacity ───────────────────────────────────────────
+  float rawInk = texture(u_dye, v_uv).r;
+  rawInk = clamp(rawInk, 0.0, 1.5); // RGBA16F can slightly overshoot
+
+  // Exponential feather: slow rise at low concentrations, asymptote near 1.
+  // k=3.0: ink=0.1→26% opaque, ink=0.5→78%, ink=1.0→95% — long feather tail.
+  float opacity = 1.0 - exp(-rawInk * 3.0);
+  opacity = clamp(opacity, 0.0, 1.0);
+
+  // ── Secondary edge hue ────────────────────────────────────────────────────
+  // At thin ink margins, secondary color bleeds in (paper fiber absorption).
+  // edgeFactor is 1 where ink is sparse, 0 where ink is dense.
+  float edgeFactor = 1.0 - smoothstep(0.05, 0.40, rawInk);
+  vec3 inkColor = mix(u_inkPrimary, u_inkSecondary, edgeFactor * 0.55);
+
+  // ── Composite: ink over paper ─────────────────────────────────────────────
+  vec3 color = mix(paperColor, inkColor, opacity);
+
+  // ── Vignette ──────────────────────────────────────────────────────────────
+  // Gentle radial darkening toward edges (~28% max at corners).
+  float dist     = length(v_uv - 0.5) * 1.85;
+  float vignette = 1.0 - smoothstep(0.55, 1.0, dist) * 0.28;
+  color *= vignette;
+
+  fragColor = vec4(color, 1.0);
 }

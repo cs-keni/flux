@@ -134,14 +134,14 @@ No paper layer. Dye displayed raw to verify sim correctness.
 
 ## Phase 2 — The Visual Layer (Weeks 6–10)
 
-- [ ] Paper texture shader: FBM + Worley noise composite, warm #F2EDD7 color
-- [ ] Ink feather render pass: dye concentration → opacity curve
-- [ ] Ink-on-paper composite: ink over paper texture, multiplicative blend
-- [ ] Vignette pass
-- [ ] Palette system: Sumi (#1A1209), Indigo (#1B2A4A), Sepia (#3D2008)
-  - Selectable via keyboard only (no visible UI)
-  - Secondary hue that appears at thin ink edges
-- [ ] **Visual milestone:** screenshots should look like ink paintings
+- [x] Paper texture shader: FBM + Worley noise composite, warm #F2EDD7 color
+- [x] Ink feather render pass: dye concentration → opacity curve (1−exp(−ink×3))
+- [x] Ink-on-paper composite: ink over paper texture, alpha blend
+- [x] Vignette pass: radial smoothstep, ~28% max darkening at corners
+- [x] Palette system: Sumi (#1A1209), Indigo (#1B2A4A), Sepia (#3D2008)
+  - Selectable via keyboard only (1/2/3 direct, P to cycle — no visible UI)
+  - Secondary hue that appears at thin ink edges (edgeFactor blend, 55% max)
+- [x] **Visual milestone:** screenshots look like ink paintings ✓ (Playwright baseline updated)
 
 ---
 

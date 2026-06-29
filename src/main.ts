@@ -75,6 +75,14 @@ async function init(): Promise<void> {
     initDevOverlay(config);
   }
 
+  // Palette keyboard shortcuts (Phase 2). No visible UI — keyboard only.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '1') sim.setPalette(0); // Sumi
+    if (e.key === '2') sim.setPalette(1); // Indigo
+    if (e.key === '3') sim.setPalette(2); // Sepia
+    if (e.key === 'p' || e.key === 'P') sim.cyclePalette();
+  });
+
   sim.init();
 
   if (isHeadless()) {

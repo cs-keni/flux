@@ -1,5 +1,39 @@
 # Engineering Log
 
+## 2026-06-29
+
+### Phase 2 commit — feat: implement full Phase 2 visual layer (paper, ink feather, vignette, palette)
+
+**Files changed:** `src/shaders/render.frag.glsl`, `src/sim/config.ts`, `src/sim/FluidSim.ts`, `src/main.ts`, `tests/e2e/fluid.spec.ts-snapshots/fluid-baseline-chromium-linux.png`, `PHASES.md`, `docs/`
+
+**Paper texture** (`render.frag.glsl`):
+- 5-octave FBM with 30° rotation to break grid alignment, scale 580×
+- Worley (cellular) noise at scale 30× for paper fiber structure
+- Mix: 78% FBM + 22% Worley, ±2.8% luminance variation on #F2EDD7 base
+
+**Ink feather curve** (`render.frag.glsl`):
+- `opacity = 1 − exp(−rawInk × 3.0)` — exponential onset with long low-opacity tail
+- Clamps RGBA16F overshoot at 1.5 before feather curve
+- ink=0.1 → 26%; ink=0.5 → 78%; ink=1.0 → 95%
+
+**Secondary edge hue** (`render.frag.glsl`):
+- `edgeFactor = 1 − smoothstep(0.05, 0.40, rawInk)` — active at thin ink margins
+- Blends up to 55% secondary color at the outer feather of each stroke
+- Creates physical ink-bleeding-into-paper-fibers appearance
+
+**Ink-on-paper composite**: alpha blend `mix(paperColor, inkColor, opacity)`
+
+**Vignette**: `1 − smoothstep(0.55, 1.0, length(uv−0.5)×1.85) × 0.28` — ~28% max darkening at corners
+
+**Palette system** (`config.ts`, `FluidSim.ts`, `main.ts`):
+- `Palette` interface: `primary` + `secondary` (linear RGB tuples)
+- `PALETTES[3]`: Sumi (#1A1209, blue-grey secondary), Indigo (#1B2A4A, lighter cool blue), Sepia (#3D2008, warm amber)
+- `FluidSim.setPalette(n)` + `FluidSim.cyclePalette()`
+- Keyboard handlers in `main.ts`: `1/2/3` direct, `P` to cycle
+- Uniforms `u_inkPrimary` / `u_inkSecondary` passed to render shader every frame
+
+**Playwright baseline**: regenerated on chromium-linux 1280×720 — 1 test passing
+
 ## 2026-06-28
 
 ### d2b89cf — fix: surface runtime errors before sim init and add EXT_color_buffer_float guard

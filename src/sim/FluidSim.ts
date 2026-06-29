@@ -19,7 +19,7 @@
  *   pressure  R16F  ping-pong   [p]
  */
 
-import { SimConfig } from './config';
+import { SimConfig, PALETTES } from './config';
 import { FBOManager, PingPong, FBO } from './FBOManager';
 import { createProgram } from './glUtils';
 
@@ -70,6 +70,7 @@ export class FluidSim {
 
   private paused: boolean = false;
   private pendingSplats: SplatEvent[] = [];
+  private paletteIndex: number = 0;
 
   constructor(gl: WebGL2RenderingContext, config: SimConfig, mobile: boolean) {
     this.gl = gl;
@@ -182,6 +183,8 @@ export class FluidSim {
 
   render(): void {
     const gl = this.gl;
+    const palette = PALETTES[this.paletteIndex];
+
     gl.bindVertexArray(this.quadVAO);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -190,9 +193,19 @@ export class FluidSim {
     gl.uniform1i(gl.getUniformLocation(this.renderProgram, 'u_dye'), 0);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.dye.read.texture);
+    gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkPrimary'), palette.primary);
+    gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkSecondary'), palette.secondary);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.bindVertexArray(null);
+  }
+
+  setPalette(index: number): void {
+    this.paletteIndex = ((index % PALETTES.length) + PALETTES.length) % PALETTES.length;
+  }
+
+  cyclePalette(): void {
+    this.paletteIndex = (this.paletteIndex + 1) % PALETTES.length;
   }
 
   onResize(): void {
