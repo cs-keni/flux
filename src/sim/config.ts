@@ -35,29 +35,58 @@ export const PALETTES: readonly Palette[] = [
   },
 ] as const;
 
-const DESKTOP: SimConfig = {
-  resolution: 512,
-  jacobiIterations: 40,   // D12: 20 doesn't converge on 512×512
-  diffuseIterations: 5,   // D13: near-zero viscosity converges fast
-  viscosity: 0.0001,      // D13: ink is not viscous
+// ── GPU tier configs ──────────────────────────────────────────────────────────
+// LOW  (256) — mobile or legacy integrated GPU
+// MID  (512) — desktop default; most laptops with modern integrated GPU
+// HIGH (768) — confirmed discrete GPU or Apple Silicon
+
+const BASE: Omit<SimConfig, 'resolution' | 'jacobiIterations'> = {
+  diffuseIterations: 5,   // near-zero viscosity converges fast
+  viscosity: 0.0001,      // ink is not viscous
   splatRadius: 0.25,
   force: 6000,
-  dt: 1 / 60,             // D15: fixed dt, semi-Lagrangian stability
-  frameCapMs: 100,        // D15: cap prevents huge backtrace on tab restore
+  dt: 1 / 60,             // fixed dt, semi-Lagrangian stability
+  frameCapMs: 100,        // cap prevents huge backtrace on tab restore
   wetOnWetStrength: 1.8,  // at full ink overlap: velocity is 2.8× (noticeable bleed, not chaotic)
 };
 
-const MOBILE: SimConfig = {
-  ...DESKTOP,
-  resolution: 256,        // D10: 2× fillrate savings on mobile GPU
-  jacobiIterations: 20,   // D12: lower res needs fewer iterations to converge
-};
+const LOW: SimConfig  = { ...BASE, resolution: 256, jacobiIterations: 20 };
+const MID: SimConfig  = { ...BASE, resolution: 512, jacobiIterations: 40 };
+// HIGH reuses 40 Jacobi iters — slight under-convergence at 768 is invisible in an ink sim
+const HIGH: SimConfig = { ...BASE, resolution: 768, jacobiIterations: 40 };
+
+// ── GPU tier detection ────────────────────────────────────────────────────────
 
 // D10: avoid UA parsing; DPR alone is insufficient (Retina Macs trigger it)
 export function isMobile(): boolean {
   return navigator.maxTouchPoints > 0 && screen.width < 768;
 }
 
-export function getConfig(): SimConfig {
-  return isMobile() ? MOBILE : DESKTOP;
+function gpuTier(gl: WebGL2RenderingContext): 'low' | 'mid' | 'high' {
+  const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
+  if (maxTex <= 4096) return 'low';  // very old GPU
+
+  // Best signal: actual GPU name via debug extension (available in Chrome/Firefox)
+  const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+  if (dbg) {
+    const renderer = (gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) as string).toLowerCase();
+    // Discrete GPU or Apple Silicon: confirm high-end tier
+    if (/geforce|quadro|radeon|rtx|gtx|\brx \d|tesla|apple m[0-9]/.test(renderer)) return 'high';
+    // Legacy Intel integrated: keep at mid (UHD 6xx / HD 6xx / GMA)
+    if (/intel (hd|uhd) [0-9]{3}[^0-9]|intel gma/.test(renderer)) return 'mid';
+  }
+
+  // Fallback when debug info is unavailable (Firefox with privacy.resistFingerprinting, etc.)
+  // Use device memory (Chrome/Edge) + max texture size as a combined proxy
+  const mem: number | undefined = (navigator as any).deviceMemory;
+  if (mem !== undefined && mem >= 8 && maxTex >= 16384) return 'high';
+
+  return 'mid';
+}
+
+export function getConfig(gl?: WebGL2RenderingContext): SimConfig {
+  if (isMobile()) return LOW;
+  if (!gl) return MID;  // fallback when called without context (e.g., tests)
+  const tier = gpuTier(gl);
+  return tier === 'high' ? HIGH : tier === 'low' ? LOW : MID;
 }

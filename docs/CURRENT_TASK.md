@@ -29,7 +29,7 @@ All Phase 3 deliverables shipped (minus the two explicitly deferred to Phase 4):
 ### Next: Phase 4 — Refinement (in progress)
 - [x] Auto-pilot: 7 new sequences (ENSO, MOUNTAIN, BIRD, FISH, BAMBOO, SPIRAL, RAIN) — total 10 done
 - [x] Wet-on-wet tuning: velocity injection for stroke intersection bleed (wetOnWetStrength=1.8)
-- [ ] Resolution scaling: auto-detect device capability (256/512/768)
+- [x] Resolution scaling: GPU tier detection → LOW 256 / MID 512 / HIGH 768
 - [x] "Ink dry" animation: 60s idle → ink darkens + edges sharpen (visual-only, render shader)
 - [x] High-DPI export: 2048×2048 PNG — offscreen WebGL2 re-render, paper grain at native 2048px
 - [x] Keyboard shortcut overlay: appears 2s after load, dismisses on first interaction

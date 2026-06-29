@@ -2,6 +2,27 @@
 
 ## 2026-06-29
 
+### Phase 4 — resolution auto-scaling (256 / 512 / 768)
+
+**Files changed:** `src/sim/config.ts`, `src/main.ts`
+
+**Three GPU tiers:**
+- LOW (256, 20 Jacobi): mobile OR legacy GPU with MAX_TEXTURE_SIZE ≤ 4096
+- MID (512, 40 Jacobi): desktop default — modern integrated GPU, unrecognized renderer
+- HIGH (768, 40 Jacobi): confirmed discrete GPU or Apple Silicon
+
+**Detection (`gpuTier()` in config.ts):**
+1. `WEBGL_debug_renderer_info.UNMASKED_RENDERER_WEBGL` — primary signal (available Chrome/Firefox)
+   - Matches `geforce|quadro|radeon|rtx|gtx|rx \d|tesla|apple m[0-9]` → HIGH
+   - Matches `intel (hd|uhd) [0-9]{3}|intel gma` → MID
+2. Fallback: `navigator.deviceMemory ≥ 8` AND `MAX_TEXTURE_SIZE ≥ 16384` → HIGH
+
+**Why 40 Jacobi at 768:** pressure solve is slightly under-converged vs the theoretical ~60 for 768×512 ratio, but the visual difference in an ink sim is imperceptible. 40 iters at 768² is already 2.25× the work of 512², which is well within discrete GPU headroom.
+
+**Config refactor:** `BASE` object holds all non-resolution/Jacobi fields; LOW/MID/HIGH spread from it — single source of truth for tuning values. `getConfig(gl?)` is backwards compatible (no gl = returns MID, used by tests).
+
+---
+
 ### Phase 4 — keyboard shortcut overlay + high-DPI export
 
 **Files changed:** `src/ui/ShortcutOverlay.ts` (new), `src/sim/FluidSim.ts`, `src/main.ts`

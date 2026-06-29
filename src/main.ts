@@ -68,7 +68,7 @@ async function init(): Promise<void> {
 
   resizeCanvas(canvas);
 
-  const config = getConfig();
+  const config = getConfig(gl);
 
   const { FluidSim } = await import('./sim/FluidSim');
   const { InputHandler } = await import('./input/InputHandler');
