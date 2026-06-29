@@ -248,6 +248,93 @@ export class FluidSim {
     this.fboManager?.destroyAll();
   }
 
+  // Export the current frame as a high-resolution PNG.
+  // Re-renders the full render shader (paper texture + ink) at `size`×`size` on
+  // an offscreen canvas — paper grain is computed at native 2048×2048 detail
+  // rather than being scaled up from the display canvas. Falls back to scaling
+  // the display canvas via 2D context if offscreen WebGL2 is unavailable.
+  exportHighRes(size: number = 2048): string {
+    const gl = this.gl;
+    const { resolution } = this.config;
+    const palette = PALETTES[this.paletteIndex];
+
+    // Read current dye and velocity FBO data from the main GL context
+    const pixelCount = resolution * resolution * 4;
+    const dyeData = new Float32Array(pixelCount);
+    const velData = new Float32Array(pixelCount);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.dye.read.framebuffer);
+    gl.readPixels(0, 0, resolution, resolution, gl.RGBA, gl.FLOAT, dyeData);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.velocity.read.framebuffer);
+    gl.readPixels(0, 0, resolution, resolution, gl.RGBA, gl.FLOAT, velData);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = size;
+    offCanvas.height = size;
+    const off = offCanvas.getContext('webgl2', {
+      alpha: false,
+      antialias: false,
+      preserveDrawingBuffer: true,
+    });
+
+    if (!off) {
+      // Fallback: scale the display canvas via 2D blit
+      const ctx = offCanvas.getContext('2d')!;
+      ctx.fillStyle = '#F2EDD7';
+      ctx.fillRect(0, 0, size, size);
+      ctx.drawImage(gl.canvas as HTMLCanvasElement, 0, 0, size, size);
+      return offCanvas.toDataURL('image/png');
+    }
+
+    // Enable linear filtering on float textures when available
+    off.getExtension('OES_texture_float_linear');
+
+    const uploadTex = (data: Float32Array): WebGLTexture => {
+      const tex = off.createTexture()!;
+      off.bindTexture(off.TEXTURE_2D, tex);
+      // RGBA32F: no extension needed to upload/sample, only to render-to
+      off.texImage2D(off.TEXTURE_2D, 0, off.RGBA32F, resolution, resolution, 0, off.RGBA, off.FLOAT, data);
+      off.texParameteri(off.TEXTURE_2D, off.TEXTURE_MIN_FILTER, off.LINEAR);
+      off.texParameteri(off.TEXTURE_2D, off.TEXTURE_MAG_FILTER, off.LINEAR);
+      off.texParameteri(off.TEXTURE_2D, off.TEXTURE_WRAP_S, off.CLAMP_TO_EDGE);
+      off.texParameteri(off.TEXTURE_2D, off.TEXTURE_WRAP_T, off.CLAMP_TO_EDGE);
+      return tex;
+    };
+
+    const dyeTex = uploadTex(dyeData);
+    const velTex = uploadTex(velData);
+
+    // Compile render program (quadVert + renderFrag already imported by this module)
+    const prog = createProgram(off, quadVert, renderFrag);
+
+    // Fullscreen quad VAO
+    const buf = off.createBuffer()!;
+    off.bindBuffer(off.ARRAY_BUFFER, buf);
+    off.bufferData(off.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), off.STATIC_DRAW);
+    const vao = off.createVertexArray()!;
+    off.bindVertexArray(vao);
+    off.enableVertexAttribArray(0);
+    off.vertexAttribPointer(0, 2, off.FLOAT, false, 0, 0);
+
+    // Render at high resolution — paper grain recomputed at full 2048×2048 detail
+    off.viewport(0, 0, size, size);
+    off.bindFramebuffer(off.FRAMEBUFFER, null);
+    off.useProgram(prog);
+    off.uniform1i(off.getUniformLocation(prog, 'u_dye'), 0);
+    off.uniform1i(off.getUniformLocation(prog, 'u_velocity'), 1);
+    off.activeTexture(off.TEXTURE0);
+    off.bindTexture(off.TEXTURE_2D, dyeTex);
+    off.activeTexture(off.TEXTURE1);
+    off.bindTexture(off.TEXTURE_2D, velTex);
+    off.uniform3fv(off.getUniformLocation(prog, 'u_inkPrimary'), palette.primary);
+    off.uniform3fv(off.getUniformLocation(prog, 'u_inkSecondary'), palette.secondary);
+    off.uniform1f(off.getUniformLocation(prog, 'u_idleTime'), 0.0); // export always looks fresh
+    off.drawArrays(off.TRIANGLE_STRIP, 0, 4);
+
+    return offCanvas.toDataURL('image/png');
+  }
+
   // ── Pass implementations ─────────────────────────────────────────────────
 
   private blit(target: WebGLFramebuffer | null): void {

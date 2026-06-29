@@ -3,6 +3,7 @@ import { initDevOverlay, tickFPS } from './dev/DevOverlay';
 import { isHeadless, REPLAY_SEQUENCE, REPLAY_TOTAL_FRAMES } from './sim/headless';
 import { SEQUENCES, getAutoPilotSplat, AutoPilotSequence } from './autopilot/sequences';
 import { HintOverlay } from './ui/HintOverlay';
+import { ShortcutOverlay } from './ui/ShortcutOverlay';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
@@ -39,11 +40,23 @@ function resizeCanvas(canvas: HTMLCanvasElement): void {
   }
 }
 
-function saveCanvas(canvas: HTMLCanvasElement): void {
-  const link = document.createElement('a');
-  link.download = `flux-${Date.now()}.png`;
-  link.href = canvas.toDataURL('image/png');
-  link.click();
+function flashSaved(): void {
+  const el = document.createElement('div');
+  el.textContent = 'saved.';
+  el.style.cssText = `
+    position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+    font-family:Georgia,'Times New Roman',serif;font-size:0.78rem;
+    letter-spacing:0.14em;color:rgba(26,18,9,0.45);
+    pointer-events:none;user-select:none;
+    opacity:1;transition:opacity 1.4s ease;
+  `;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 1500);
+    }, 900);
+  });
 }
 
 async function init(): Promise<void> {
@@ -62,6 +75,7 @@ async function init(): Promise<void> {
 
   const sim = new FluidSim(gl, config, isMobile());
   const hint = new HintOverlay();
+  const shortcuts = new ShortcutOverlay();
 
   // Auto-pilot state
   let autoPilotActive    = false;
@@ -97,6 +111,7 @@ async function init(): Promise<void> {
     lastInputTime = performance.now();
     if (autoPilotActive && !autoPilotForced) stopAutoPilot();
     hint.onInput();
+    shortcuts.dismiss();
   }
 
   new InputHandler(canvas, sim, onUserInput);
@@ -122,6 +137,7 @@ async function init(): Promise<void> {
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    shortcuts.dismiss();
     if (e.key === '1') sim.setPalette(0);
     if (e.key === '2') sim.setPalette(1);
     if (e.key === '3') sim.setPalette(2);
@@ -131,7 +147,23 @@ async function init(): Promise<void> {
       sim.reset();
       hint.onInput();
     }
-    if (e.key === 's' || e.key === 'S') saveCanvas(canvas);
+    if (e.key === 's' || e.key === 'S') {
+      try {
+        const url = sim.exportHighRes(2048);
+        const link = document.createElement('a');
+        link.download = `flux-${Date.now()}.png`;
+        link.href = url;
+        link.click();
+        flashSaved();
+      } catch {
+        // Offscreen WebGL failed — fall back to current display canvas
+        const link = document.createElement('a');
+        link.download = `flux-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        flashSaved();
+      }
+    }
     if (e.key === 'a' || e.key === 'A') {
       if (autoPilotActive) {
         stopAutoPilot();

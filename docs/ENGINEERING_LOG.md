@@ -2,6 +2,31 @@
 
 ## 2026-06-29
 
+### Phase 4 — keyboard shortcut overlay + high-DPI export
+
+**Files changed:** `src/ui/ShortcutOverlay.ts` (new), `src/sim/FluidSim.ts`, `src/main.ts`
+
+**ShortcutOverlay (`src/ui/ShortcutOverlay.ts`):**
+- New class, same structure as HintOverlay
+- Appears 2s after load, auto-dismisses after 8s or immediately on any key/touch/mouse input
+- Shows: `1·2·3 palette`, `P cycle palette`, `R reset canvas`, `S save PNG`, `A auto-pilot`
+- Hidden entirely on touch-primary mobile devices (no keyboard to discover)
+- Session-only: once dismissed it removes itself from the DOM, never returns
+- Positioned bottom-right in serif type matching the app aesthetic
+
+**High-DPI export (`FluidSim.exportHighRes(size=2048)`):**
+- `gl.readPixels` reads current dye and velocity FBOs as Float32Array from the main context
+- Creates an offscreen 2048×2048 canvas with a fresh WebGL2 context
+- Uploads float data as RGBA32F textures (no extension needed for upload/sample)
+- Compiles the full render shader (paper FBM + Worley grain computed natively at 2048×2048)
+- Re-renders: paper texture detail is 4× finer than the display canvas
+- Falls back to 2D `drawImage` scale-up if offscreen WebGL2 is unavailable
+- `flashSaved()` in main.ts shows a brief "saved." label bottom-center after download
+
+**main.ts:** S key now calls `sim.exportHighRes(2048)`, removed old `saveCanvas()` helper
+
+---
+
 ### Phase 4 — ink-dry animation
 
 **Files changed:** `src/shaders/render.frag.glsl`, `src/sim/FluidSim.ts`, `src/main.ts`
