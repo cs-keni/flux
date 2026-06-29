@@ -28,7 +28,7 @@ All Phase 3 deliverables shipped (minus the two explicitly deferred to Phase 4):
 
 ### Next: Phase 4 — Refinement (in progress)
 - [x] Auto-pilot: 7 new sequences (ENSO, MOUNTAIN, BIRD, FISH, BAMBOO, SPIRAL, RAIN) — total 10 done
-- [ ] Wet-on-wet tuning: velocity injection for stroke intersection bleed
+- [x] Wet-on-wet tuning: velocity injection for stroke intersection bleed (wetOnWetStrength=1.8)
 - [ ] Resolution scaling: auto-detect device capability (256/512/768)
 - [ ] "Ink dry" animation: 60s idle → ink subtly darkens (visual-only)
 - [ ] High-DPI export: 2048×2048 PNG via offscreen canvas

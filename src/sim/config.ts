@@ -7,6 +7,7 @@ export interface SimConfig {
   force: number;
   dt: number;
   frameCapMs: number;
+  wetOnWetStrength: number;  // velocity boost at ink intersections (0 = off, ~1.8 = natural bleed)
 }
 
 export interface Palette {
@@ -43,6 +44,7 @@ const DESKTOP: SimConfig = {
   force: 6000,
   dt: 1 / 60,             // D15: fixed dt, semi-Lagrangian stability
   frameCapMs: 100,        // D15: cap prevents huge backtrace on tab restore
+  wetOnWetStrength: 1.8,  // at full ink overlap: velocity is 2.8× (noticeable bleed, not chaotic)
 };
 
 const MOBILE: SimConfig = {

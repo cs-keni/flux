@@ -2,6 +2,30 @@
 
 ## 2026-06-29
 
+### Phase 4 — wet-on-wet tuning
+
+**Files changed:** `src/shaders/splat.frag.glsl`, `src/sim/FluidSim.ts`, `src/sim/config.ts`
+
+**Mechanism:** When a new brushstroke lands on existing wet ink, the velocity injection is amplified proportional to the local ink concentration. This makes existing ink bleed and spread outward at crossing points — the defining behavior of wet-on-wet sumi-e technique.
+
+**Shader (`splat.frag.glsl`):**
+- Added `uniform sampler2D u_dye` (texture unit 1 — existing ink field)
+- Added `uniform float u_wetFactor` (0 = dry splat; >0 = wet-on-wet)
+- `boost = 1.0 + existingInk × u_wetFactor` — velocity injection scaled up at ink intersections
+- Guard `if (u_wetFactor > 0.0)` so dye pass never samples u_dye (avoids feedback on dye ping-pong)
+
+**FluidSim.ts (`runSplat`):**
+- Velocity pass: u_dye bound to unit 1 (dye.read), u_wetFactor = config.wetOnWetStrength
+- Dye pass: u_wetFactor = 0.0 — ink addition stays additive; spreading is handled by the amplified velocity
+
+**Config (`config.ts`):**
+- Added `wetOnWetStrength: number` to SimConfig interface
+- Default: 1.8 → at full ink overlap, velocity boost is 2.8× (visible bleed, not chaotic)
+
+**Tuning notes:** wetOnWetStrength 0 = disabled, 1.0 = subtle, 1.8 = natural, 3.0+ = strong/chaotic.
+
+---
+
 ### Phase 4 — auto-pilot sequences (7 new, total 10)
 
 **Files changed:** `src/autopilot/sequences.ts`

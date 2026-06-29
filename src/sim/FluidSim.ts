@@ -258,26 +258,34 @@ export class FluidSim {
   private runSplat(s: SplatEvent, radius: number, force: number): void {
     const gl = this.gl;
     const prog = this.splatProgram;
-    const { resolution } = this.config;
+    const { resolution, wetOnWetStrength } = this.config;
     const aspectRatio = gl.drawingBufferWidth / gl.drawingBufferHeight;
 
-    // Velocity splat
     gl.useProgram(prog);
     gl.uniform1i(gl.getUniformLocation(prog, 'u_target'), 0);
+    gl.uniform1i(gl.getUniformLocation(prog, 'u_dye'), 1);
+
+    // Always bind dye texture on unit 1 so the sampler is valid in both passes.
+    // It is only actually read when u_wetFactor > 0 (velocity pass).
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.dye.read.texture);
+
+    // Velocity splat — wet-on-wet boost applied here
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.velocity.read.texture);
     gl.uniform2f(gl.getUniformLocation(prog, 'u_point'), s.x, s.y);
     gl.uniform3f(gl.getUniformLocation(prog, 'u_color'), s.dx * force, s.dy * force, 0.0);
     gl.uniform1f(gl.getUniformLocation(prog, 'u_radius'), radius / resolution);
     gl.uniform1f(gl.getUniformLocation(prog, 'u_aspectRatio'), aspectRatio);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_wetFactor'), wetOnWetStrength);
     this.blit(this.velocity.write.framebuffer);
     this.velocity.swap();
 
-    // Dye splat
+    // Dye splat — no wet-on-wet; spreading is handled by the amplified velocity field
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.dye.read.texture);
-    gl.uniform2f(gl.getUniformLocation(prog, 'u_point'), s.x, s.y);
     gl.uniform3f(gl.getUniformLocation(prog, 'u_color'), 1.0, 0.0, 0.0);
-    gl.uniform1f(gl.getUniformLocation(prog, 'u_radius'), radius / resolution);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_wetFactor'), 0.0);
     this.blit(this.dye.write.framebuffer);
     this.dye.swap();
   }
