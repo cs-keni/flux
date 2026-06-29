@@ -2,6 +2,26 @@
 
 ## 2026-06-29
 
+### Phase 4 — auto-pilot sequences (7 new, total 10)
+
+**Files changed:** `src/autopilot/sequences.ts`
+
+Added 7 new auto-pilot sequences to reach the 10-sequence target:
+
+- **ENSO**: single 340° sweeping arc (Zen circle with traditional gap) + brush-lift tail
+- **MOUNTAIN**: three peaks inspired by 山, each up-and-over stroke + horizontal ground line
+- **BIRD**: crane in flight — two large wing arcs, body, neck curve, small head arc
+- **FISH**: koi silhouette — upper/lower body arcs forming a lens, two tail fans, dorsal fin
+- **BAMBOO**: two stalks with node marks and leaf clusters in diagonal strokes
+- **SPIRAL**: outward Archimedes spiral (2.5 rotations, r 0.02→0.30) + exit flick
+- **RAIN**: 18 short diagonal streaks in three waves sweeping upper→lower canvas
+
+New helpers added: `arc()` (circle segment, clockwise sweepDeg) and `spiral()` (Archimedes, r grows with f).
+
+All coordinates respect WebGL y-up convention. TypeScript type-check passes; 14 Vitest unit tests pass.
+
+---
+
 ### Phase 3 — polish and depth (multi-touch, auto-pilot, save/reset, directional feather)
 
 **Files changed:** `src/sim/FluidSim.ts`, `src/main.ts`, `src/input/InputHandler.ts`, `src/shaders/render.frag.glsl`, `src/autopilot/sequences.ts` (new), `src/ui/HintOverlay.ts` (new), `tests/e2e/fluid.spec.ts`, `PHASES.md`, `docs/`
