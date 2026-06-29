@@ -206,7 +206,7 @@ async function init(): Promise<void> {
     const elapsed = Math.min(now - lastTime, 100);
     lastTime = now;
     sim.step(elapsed);
-    sim.render();
+    sim.render((now - lastInputTime) / 1000);
     if (import.meta.env.DEV) tickFPS(now);
 
     sim.rafId = requestAnimationFrame(frame);

@@ -2,6 +2,26 @@
 
 ## 2026-06-29
 
+### Phase 4 — ink-dry animation
+
+**Files changed:** `src/shaders/render.frag.glsl`, `src/sim/FluidSim.ts`, `src/main.ts`
+
+After 60s of user idle, ink visually "settles" — edges sharpen and color deepens — like sumi ink drying on rice paper. Fully dry at 120s. Resets immediately on next user input.
+
+**Shader (`render.frag.glsl`):**
+- Added `uniform float u_idleTime` (seconds since last user input)
+- `dryFactor = smoothstep(60.0, 120.0, u_idleTime)` — 0 at 60s, 1 at 120s
+- `driedPrimary = u_inkPrimary × 0.88 + vec3(-0.006, -0.003, +0.010)` — 12% darker, subtle cool shift (settled carbon)
+- `effectivePrimary = mix(u_inkPrimary, driedPrimary, dryFactor)` — smooth transition
+- `kFactor = mix(3.0, 3.8, dryFactor)` — feather exponent tightens, edges crisp up as moisture evaporates
+- Secondary edge hue now mixes against `effectivePrimary` instead of `u_inkPrimary`
+
+**FluidSim.ts:** `render(idleSeconds: number = 0)` — binds `u_idleTime`
+
+**main.ts:** passes `(now - lastInputTime) / 1000` to `render()`
+
+---
+
 ### Phase 4 — wet-on-wet tuning
 
 **Files changed:** `src/shaders/splat.frag.glsl`, `src/sim/FluidSim.ts`, `src/sim/config.ts`

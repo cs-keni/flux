@@ -188,7 +188,7 @@ export class FluidSim {
     gl.bindVertexArray(null);
   }
 
-  render(): void {
+  render(idleSeconds: number = 0): void {
     const gl = this.gl;
     const palette = PALETTES[this.paletteIndex];
 
@@ -205,6 +205,7 @@ export class FluidSim {
     gl.bindTexture(gl.TEXTURE_2D, this.velocity.read.texture);
     gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkPrimary'), palette.primary);
     gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkSecondary'), palette.secondary);
+    gl.uniform1f(gl.getUniformLocation(this.renderProgram, 'u_idleTime'), idleSeconds);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.bindVertexArray(null);

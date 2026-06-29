@@ -8,6 +8,7 @@ uniform sampler2D u_dye;
 uniform sampler2D u_velocity;  // velocity field for directional feather (Phase 3)
 uniform vec3 u_inkPrimary;     // ink color at full concentration
 uniform vec3 u_inkSecondary;   // edge bleed hue at thin ink margins
+uniform float u_idleTime;      // seconds since last user input (for ink-dry animation)
 
 // ── 2D hash noise ────────────────────────────────────────────────────────────
 
@@ -89,16 +90,29 @@ void main() {
     rawInk = mix(rawInk, inkDown, velStrength * 0.28);
   }
 
+  // ── Ink-dry animation ─────────────────────────────────────────────────────
+  // After 60s idle the ink visually "settles": edges crisp up and color deepens
+  // slightly, as sumi ink does on rice paper. Fully dry at 120s. Reverses
+  // immediately when the user draws again (u_idleTime resets to 0).
+  float dryFactor = smoothstep(60.0, 120.0, u_idleTime);
+
+  // Dried ink: slightly darker and cooler (settled carbon particles)
+  vec3 driedPrimary = u_inkPrimary * 0.88 + vec3(-0.006, -0.003, 0.010);
+  vec3 effectivePrimary = mix(u_inkPrimary, driedPrimary, dryFactor);
+
+  // Edges sharpen as moisture evaporates: k rises from 3.0 → 3.8
+  float kFactor = mix(3.0, 3.8, dryFactor);
+
   // Exponential feather: slow rise at low concentrations, asymptote near 1.
   // k=3.0: ink=0.1→26% opaque, ink=0.5→78%, ink=1.0→95% — long feather tail.
-  float opacity = 1.0 - exp(-rawInk * 3.0);
+  float opacity = 1.0 - exp(-rawInk * kFactor);
   opacity = clamp(opacity, 0.0, 1.0);
 
   // ── Secondary edge hue ────────────────────────────────────────────────────
   // At thin ink margins, secondary color bleeds in (paper fiber absorption).
   // edgeFactor is 1 where ink is sparse, 0 where ink is dense.
   float edgeFactor = 1.0 - smoothstep(0.05, 0.40, rawInk);
-  vec3 inkColor = mix(u_inkPrimary, u_inkSecondary, edgeFactor * 0.55);
+  vec3 inkColor = mix(effectivePrimary, u_inkSecondary, edgeFactor * 0.55);
 
   // ── Composite: ink over paper ─────────────────────────────────────────────
   vec3 color = mix(paperColor, inkColor, opacity);
