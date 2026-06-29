@@ -38,6 +38,7 @@ export interface SplatEvent {
   y: number;
   dx: number;
   dy: number;
+  radius?: number;  // override config.splatRadius (e.g. smaller for auto-pilot)
 }
 
 export class FluidSim {
@@ -135,22 +136,28 @@ export class FluidSim {
     this.pendingSplats.push(event);
   }
 
-  step(_elapsed: number): void {
+  step(elapsed: number): void {
     if (this.paused) return;
     const gl = this.gl;
-    const { resolution, jacobiIterations, diffuseIterations, viscosity, splatRadius, force, dt } = this.config;
+    const { resolution, jacobiIterations, diffuseIterations, viscosity, splatRadius, force, dt, frameCapMs } = this.config;
+
+    // Normalize dissipation to be frame-rate-independent: express elapsed as
+    // equivalent 60fps frame count so behavior is identical at any fps.
+    // 0.999 per 60fps-frame ≈ 5.9% ink loss per second regardless of actual fps.
+    const elapsedSec = Math.min(elapsed, frameCapMs) / 1000;
+    const dissipation = Math.pow(0.999, elapsedSec * 60);
 
     gl.bindVertexArray(this.quadVAO);
     gl.viewport(0, 0, resolution, resolution);
 
     // 1. Splat
     for (const s of this.pendingSplats) {
-      this.runSplat(s, splatRadius, force);
+      this.runSplat(s, s.radius ?? splatRadius, force);
     }
     this.pendingSplats = [];
 
     // 2. Advect velocity
-    this.runAdvect(this.velocity, this.velocity.read, dt);
+    this.runAdvect(this.velocity, this.velocity.read, dt, dissipation);
 
     // 3. Diffuse velocity
     if (viscosity > 0) {
@@ -176,7 +183,7 @@ export class FluidSim {
     this.runBoundary();
 
     // 8. Advect dye
-    this.runAdvect(this.dye, this.velocity.read, dt);
+    this.runAdvect(this.dye, this.velocity.read, dt, dissipation);
 
     gl.bindVertexArray(null);
   }
@@ -191,13 +198,33 @@ export class FluidSim {
 
     gl.useProgram(this.renderProgram);
     gl.uniform1i(gl.getUniformLocation(this.renderProgram, 'u_dye'), 0);
+    gl.uniform1i(gl.getUniformLocation(this.renderProgram, 'u_velocity'), 1);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.dye.read.texture);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.velocity.read.texture);
     gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkPrimary'), palette.primary);
     gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkSecondary'), palette.secondary);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.bindVertexArray(null);
+  }
+
+  reset(): void {
+    const gl = this.gl;
+    const clear = (fb: WebGLFramebuffer) => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    };
+    clear(this.velocity.read.framebuffer);
+    clear(this.velocity.write.framebuffer);
+    clear(this.dye.read.framebuffer);
+    clear(this.dye.write.framebuffer);
+    clear(this.divergence.framebuffer);
+    clear(this.pressure.read.framebuffer);
+    clear(this.pressure.write.framebuffer);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
   setPalette(index: number): void {
@@ -255,7 +282,7 @@ export class FluidSim {
     this.dye.swap();
   }
 
-  private runAdvect(target: PingPong, velocityTex: FBO, dt: number): void {
+  private runAdvect(target: PingPong, velocityTex: FBO, dt: number, dissipation: number): void {
     const gl = this.gl;
     const prog = this.advectProgram;
     const { resolution } = this.config;
@@ -268,7 +295,7 @@ export class FluidSim {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, target.read.texture);
     gl.uniform1f(gl.getUniformLocation(prog, 'u_dt'), dt);
-    gl.uniform1f(gl.getUniformLocation(prog, 'u_dissipation'), 0.999);
+    gl.uniform1f(gl.getUniformLocation(prog, 'u_dissipation'), dissipation);
     gl.uniform2f(gl.getUniformLocation(prog, 'u_texelSize'), 1.0 / resolution, 1.0 / resolution);
     gl.uniform1i(gl.getUniformLocation(prog, 'u_linearFiltering'), this.linearFiltering ? 1 : 0);
     this.blit(target.write.framebuffer);

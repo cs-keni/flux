@@ -1,32 +1,34 @@
 # Current Task
 
-## Status: Phase 2 COMPLETE — ready for Phase 3
+## Status: Phase 3 COMPLETE — ready for Phase 4
 
 ### What just completed
-Full visual layer — all 5 Phase 2 deliverables shipped in a single commit:
 
-1. **Paper texture**: FBM (5-octave, 30° rotated) + Worley noise composite in `render.frag.glsl`
-   - Scale: 580× FBM + 30× Worley; ±2.8% luminance variation on #F2EDD7 base
-   - Grain is subtle — perceptible on inspection, not noticeable at a glance
+All Phase 3 deliverables shipped (minus the two explicitly deferred to Phase 4):
 
-2. **Ink feather curve**: exponential `1 − exp(−ink × 3.0)` — slow onset, ~95% opacity at full dye
-   - ink=0.1 → 26% opacity; ink=0.5 → 78%; ink=1.0 → 95%
+1. **Directional feather** (`render.frag.glsl`): velocity-based asymmetric edge softening — ink trailing edge feathers more than leading edge. Velocity uniform `u_velocity` bound to texture unit 1.
 
-3. **Ink-on-paper composite**: alpha blend over paper, ink darkens into paper grain
+2. **Multi-touch** (`InputHandler.ts`): `Map<pointerId, {x,y}>` tracking with `setPointerCapture`; any number of simultaneous strokes.
 
-4. **Vignette**: radial `smoothstep(0.55, 1.0, dist × 1.85) × 0.28` — ~28% max at corners
+3. **Hint overlay** (`src/ui/HintOverlay.ts` — new file): "drag to paint." fades on first interaction, returns after 8s idle. Hidden during auto-pilot.
 
-5. **Palette system**: Sumi / Indigo / Sepia in `config.ts`
-   - Keyboard: `1/2/3` direct, `P` to cycle
-   - Each palette has primary ink color + secondary edge-bleed hue (55% max at thin edges)
-   - `FluidSim.setPalette(n)` and `FluidSim.cyclePalette()`
+4. **Auto-pilot sequences** (`src/autopilot/sequences.ts` — new file): BRANCH (8.5s), WAVE (7.5s), CHARACTER (8.0s). Time-based waypoint interpolation with pen-up gaps between strokes. Loops through all 3 sequences with 3s pause and canvas reset between each. 30s idle threshold. A key to force-toggle.
 
-Playwright visual regression baseline updated. All 15 tests pass (1 Playwright + 14 Vitest).
+5. **Save + Reset** (`main.ts`): S key saves `canvas.toDataURL()` PNG (requires `preserveDrawingBuffer: true`); R key clears all FBOs.
 
-### Next: Phase 3 — Polish and Depth
-- Edge feathering asymmetry: directional bias from velocity field (read `u_velocity` in render shader)
-- Wet-on-wet tuning: velocity injection parameters for convincing bleed-through
-- Auto-pilot: first 3 choreographed sequences (branch, wave, character)
-- Save feature: PNG export with paper texture baked in
-- Idle detection: 8s → hint text fade-in, 30s → auto-pilot begins
-- Touch support: multi-touch for simultaneous strokes
+6. **Frame-rate-independent dissipation** (`FluidSim.ts`): fixed critical bug where ink dissipated 4.7× faster at 280fps vs 60fps. Now uses `pow(0.999, elapsed_sec × 60)`.
+
+7. **Per-splat radius** (`FluidSim.ts`): `SplatEvent.radius?` override — auto-pilot uses 0.12 (calligraphic), user default stays 0.25.
+
+8. **Playwright headless** (`main.ts`, `tests/e2e/`): headless replay now synchronous (RAF/setTimeout throttled to ~4fps in Playwright Chromium). Test timeout raised to 40s.
+
+### Deferred to Phase 4
+- Wet-on-wet tuning: velocity injection for stroke intersection bleed
+- High-DPI 2048×2048 export
+
+### Next: Phase 4 — Refinement
+- Auto-pilot: remaining 7 sequences (total 10 target)
+- Resolution scaling: auto-detect device capability
+- "Ink dry" animation: 60s idle → ink subtly darkens
+- Wet-on-wet tuning (carried from Phase 3)
+- High-DPI export (carried from Phase 3)

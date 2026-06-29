@@ -5,8 +5,9 @@ in vec2 v_uv;
 out vec4 fragColor;
 
 uniform sampler2D u_dye;
-uniform vec3 u_inkPrimary;    // ink color at full concentration
-uniform vec3 u_inkSecondary;  // edge bleed hue at thin ink margins
+uniform sampler2D u_velocity;  // velocity field for directional feather (Phase 3)
+uniform vec3 u_inkPrimary;     // ink color at full concentration
+uniform vec3 u_inkSecondary;   // edge bleed hue at thin ink margins
 
 // ── 2D hash noise ────────────────────────────────────────────────────────────
 
@@ -73,6 +74,20 @@ void main() {
   // ── Ink concentration → opacity ───────────────────────────────────────────
   float rawInk = texture(u_dye, v_uv).r;
   rawInk = clamp(rawInk, 0.0, 1.5); // RGBA16F can slightly overshoot
+
+  // Phase 3: directional feather — ink edge is softer downstream (in flow direction),
+  // sharper upstream. Achieved by mixing in a slightly lighter downstream sample.
+  vec2 vel = texture(u_velocity, v_uv).rg;
+  float speed = length(vel);
+  if (speed > 5.0) {
+    vec2 velDir = vel / speed;
+    float velStrength = clamp(speed / 280.0, 0.0, 1.0);
+    // Sample ink slightly downstream (where ink is heading → lighter concentration)
+    float inkDown = texture(u_dye, clamp(v_uv + velDir * 0.003, 0.0, 1.0)).r;
+    inkDown = clamp(inkDown, 0.0, 1.5);
+    // Blend toward lighter downstream: trailing edge becomes more feathered
+    rawInk = mix(rawInk, inkDown, velStrength * 0.28);
+  }
 
   // Exponential feather: slow rise at low concentrations, asymptote near 1.
   // k=3.0: ink=0.1→26% opaque, ink=0.5→78%, ink=1.0→95% — long feather tail.

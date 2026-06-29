@@ -147,13 +147,19 @@ No paper layer. Dye displayed raw to verify sim correctness.
 
 ## Phase 3 — Polish and Depth (Weeks 11–18)
 
-- [ ] Edge feathering asymmetry: directional bias from velocity field
-- [ ] Wet-on-wet tuning: velocity injection for convincing stroke intersection bleed
-- [ ] Auto-pilot: first 3 choreographed sequences (branch, wave, character)
-- [ ] Save feature: PNG export with paper texture baked in
-- [ ] Idle detection: 8s → hint text, 30s → auto-pilot begins
-- [ ] Touch support: multi-touch for simultaneous strokes
-- [ ] High-DPI export: 2048×2048 PNG
+- [x] Edge feathering asymmetry: directional bias from velocity field (velocity uniform in render shader, 0.003 UV downstream sample)
+- [ ] Wet-on-wet tuning: velocity injection for convincing stroke intersection bleed (deferred to Phase 4)
+- [x] Auto-pilot: first 3 choreographed sequences (branch, wave, character) with idle detection
+- [x] Save feature: PNG export with paper texture baked in (S key, `canvas.toDataURL`)
+- [x] Idle detection: 8s → hint text fades back in; 30s → auto-pilot begins
+- [x] Touch support: multi-touch for simultaneous strokes (Map-based pointer tracking)
+- [ ] High-DPI export: 2048×2048 PNG (deferred to Phase 4)
+
+**Phase 3 bugs fixed:**
+- Frame-rate-independent dissipation (`pow(0.999, elapsed_sec × 60)`) — ink persistence was fps-dependent
+- Auto-pilot pen-up transition: reset `autoPilotPrevPos` to null on stroke end to prevent velocity spike at next stroke start
+- Per-splat radius override in `SplatEvent` for calligraphic auto-pilot strokes (0.12 vs 0.25 user default)
+- Playwright headless timeout: synchronous loop + 40s timeout (RAF/setTimeout throttled to ~4fps in headless Chrome)
 
 ---
 
