@@ -2,6 +2,14 @@
 
 ## 2026-06-30
 
+### Phase 5 — deploy to Vercel
+
+**Live URL:** https://flux-indol-gamma.vercel.app/
+
+Deployed via Vercel GitHub integration (no CLI). Auto-deploys on every push to `main`. Framework auto-detected as Vite; no `vercel.json` needed. Build: `npm run build` → `dist/`.
+
+---
+
 ### Phase 5 — palette crossfade animation
 
 **Files changed:** `src/sim/FluidSim.ts`

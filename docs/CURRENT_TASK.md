@@ -34,7 +34,12 @@ All Phase 3 deliverables shipped (minus the two explicitly deferred to Phase 4):
 - [x] High-DPI export: 2048×2048 PNG — offscreen WebGL2 re-render, paper grain at native 2048px
 - [x] Keyboard shortcut overlay: appears 2s after load, dismisses on first interaction
 
-### Now: Phase 5 — additional palettes
+### Phase 5 progress (complete so far)
+- [x] Vermilion, Pine, Prussian Blue palettes (keys 4/5/6)
+- [x] Palette crossfade (~500ms exponential lerp)
+- [x] Deploy: https://flux-indol-gamma.vercel.app/ (auto-deploys on push)
+
+### Now: Phase 5 — next item TBD
 - [x] Vermilion (#6E1208 cinnabar, key 4)
 - [x] Pine (#1E3A24 forest green, key 5)
 - [x] Prussian Blue (#0E1F3A Hokusai blue, key 6)

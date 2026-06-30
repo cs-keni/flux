@@ -178,7 +178,7 @@ No paper layer. Dye displayed raw to verify sim correctness.
 ## Phase 5 — The Depth Layer (Months 6+)
 
 - [x] Additional palettes: Vermilion (key 4), Pine (key 5), Prussian Blue (key 6)
-- [ ] Deploy/hosting: ship to a public URL (Vercel or GitHub Pages)
+- [x] Deploy/hosting: https://flux-indol-gamma.vercel.app/ (Vercel, auto-deploys on push to main)
 - [ ] WebGPU upgrade: compute shaders for 50+ Jacobi iterations
   - Abstract solver behind `GpuBackend` interface now (TODOS.md item)
 - [ ] "Watercolor" material mode: lighter, more transparent, different feather curve
