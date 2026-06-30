@@ -141,6 +141,9 @@ async function init(): Promise<void> {
     if (e.key === '1') sim.setPalette(0);
     if (e.key === '2') sim.setPalette(1);
     if (e.key === '3') sim.setPalette(2);
+    if (e.key === '4') sim.setPalette(3);
+    if (e.key === '5') sim.setPalette(4);
+    if (e.key === '6') sim.setPalette(5);
     if (e.key === 'p' || e.key === 'P') sim.cyclePalette();
     if (e.key === 'r' || e.key === 'R') {
       stopAutoPilot();

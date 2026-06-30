@@ -1,6 +1,6 @@
 # Current Task
 
-## Status: Phase 3 COMPLETE — ready for Phase 4
+## Status: Phase 4 COMPLETE — Phase 5 in progress
 
 ### What just completed
 
@@ -26,10 +26,16 @@ All Phase 3 deliverables shipped (minus the two explicitly deferred to Phase 4):
 - Wet-on-wet tuning: velocity injection for stroke intersection bleed
 - High-DPI 2048×2048 export
 
-### Next: Phase 4 — Refinement (in progress)
+### Phase 4 complete (all shipped)
 - [x] Auto-pilot: 7 new sequences (ENSO, MOUNTAIN, BIRD, FISH, BAMBOO, SPIRAL, RAIN) — total 10 done
 - [x] Wet-on-wet tuning: velocity injection for stroke intersection bleed (wetOnWetStrength=1.8)
 - [x] Resolution scaling: GPU tier detection → LOW 256 / MID 512 / HIGH 768
 - [x] "Ink dry" animation: 60s idle → ink darkens + edges sharpen (visual-only, render shader)
 - [x] High-DPI export: 2048×2048 PNG — offscreen WebGL2 re-render, paper grain at native 2048px
 - [x] Keyboard shortcut overlay: appears 2s after load, dismisses on first interaction
+
+### Now: Phase 5 — additional palettes
+- [x] Vermilion (#6E1208 cinnabar, key 4)
+- [x] Pine (#1E3A24 forest green, key 5)
+- [x] Prussian Blue (#0E1F3A Hokusai blue, key 6)
+- Keys 4/5/6 wired; ShortcutOverlay updated to show 1–6

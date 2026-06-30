@@ -165,21 +165,27 @@ No paper layer. Dye displayed raw to verify sim correctness.
 
 ## Phase 4 — Refinement (Weeks 19–28)
 
-- [ ] Auto-pilot: full 10 sequences (branch, mountain, bird, wave, character, + 5 more)
-- [ ] Resolution scaling: auto-detect device capability
-- [ ] "Ink dry" animation: 60s idle → ink subtly darkens (visual only)
-- [ ] Keyboard shortcuts: R=reset, S=save, P=palette cycle, 1/2/3=palette direct, A=autopilot
-- [ ] Optional ambient sound (paper scratch, off by default)
+- [x] Auto-pilot: full 10 sequences (ENSO, MOUNTAIN, BIRD, FISH, BAMBOO, SPIRAL, RAIN + 3 from Phase 3)
+- [x] Resolution scaling: GPU tier detection — LOW 256/MID 512/HIGH 768
+- [x] "Ink dry" animation: 60s idle → ink darkens 12% + edges sharpen (render shader, u_idleTime)
+- [x] Keyboard shortcuts: R=reset, S=save, P=cycle, 1/2/3=palette direct, A=autopilot, F=fps (dev)
+- [x] Wet-on-wet ink bleed: velocity boost at stroke intersections (wetOnWetStrength=1.8)
+- [x] Keyboard shortcut overlay: shown once on load, auto-dismisses after 8s
+- [x] High-DPI 2048×2048 export (S key): offscreen WebGL2 re-render with native paper grain
 
 ---
 
 ## Phase 5 — The Depth Layer (Months 6+)
 
+- [x] Additional palettes: Vermilion (key 4), Pine (key 5), Prussian Blue (key 6)
+- [ ] Deploy/hosting: ship to a public URL (Vercel or GitHub Pages)
 - [ ] WebGPU upgrade: compute shaders for 50+ Jacobi iterations
   - Abstract solver behind `GpuBackend` interface now (TODOS.md item)
 - [ ] "Watercolor" material mode: lighter, more transparent, different feather curve
 - [ ] Gallery: last 5 sessions in localStorage
 - [ ] Shareable link: URL hash encodes auto-pilot sequence + palette
+- [ ] Sound reactivity: mic input → auto-pilot speed or injection force
+- [ ] Dynamic resolution downgrade: monitor frame time, drop tier if avg > 20ms
 
 ---
 

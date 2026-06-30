@@ -1,5 +1,23 @@
 # Engineering Log
 
+## 2026-06-30
+
+### Phase 5 — three additional ink palettes (keys 4/5/6)
+
+**Files changed:** `src/sim/config.ts`, `src/main.ts`, `src/ui/ShortcutOverlay.ts`
+
+**New palettes added to `PALETTES` array (indices 3/4/5):**
+
+- **Vermilion** (#6E1208 primary / #C03418 secondary): Chinese cinnabar red. Dark seal-impression red at full concentration; bright orange-red bleed at thin edges. Physical reference: traditional 印章 (seal ink).
+- **Pine** (#1E3A24 primary / #3D7045 secondary): Japanese pine-shadow green (松緑). Deep forest green at full concentration; lighter moss-needle at edges. Cool blue undertone separates it from generic green.
+- **Prussian Blue** (#0E1F3A primary / #1A4870 secondary): Classic printmaking pigment (first synthetic, 1704). Near-black at full concentration; steel-blue bleed at edges. Reference: Hokusai's _The Great Wave_ blue.
+
+**Keyboard routing:** keys `4`, `5`, `6` in `main.ts` wired to `setPalette(3/4/5)`. ShortcutOverlay row changed from `'1 · 2 · 3'` to `'1–6'` (fits 56px column).
+
+**Architecture unchanged:** `setPalette(index)` already wraps modulo `PALETTES.length` — no changes needed to FluidSim or the render shader.
+
+---
+
 ## 2026-06-29
 
 ### Phase 4 — resolution auto-scaling (256 / 512 / 768)

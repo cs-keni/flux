@@ -6,7 +6,7 @@ const SHOW_DELAY_MS    = 2_000;   // wait for canvas to settle before appearing
 const AUTO_DISMISS_MS  = 8_000;   // auto-fade if user never interacts
 
 const ROWS: [string, string][] = [
-  ['1 · 2 · 3', 'palette'],
+  ['1–6',        'palette'],
   ['P',          'cycle palette'],
   ['R',          'reset canvas'],
   ['S',          'save PNG'],

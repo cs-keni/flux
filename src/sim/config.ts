@@ -16,7 +16,7 @@ export interface Palette {
   secondary: readonly [number, number, number];  // edge bleed hue at thin margins
 }
 
-// Three curated ink palettes (D per SPEC). Colors are physical ink references.
+// Six curated ink palettes. Colors are physical ink references; values are sRGB/255.
 export const PALETTES: readonly Palette[] = [
   {
     name: 'Sumi',
@@ -32,6 +32,21 @@ export const PALETTES: readonly Palette[] = [
     name: 'Sepia',
     primary:   [0.239, 0.125, 0.031], // #3D2008 — dark amber-brown
     secondary: [0.430, 0.280, 0.130], // warm amber bleed at edges
+  },
+  {
+    name: 'Vermilion',
+    primary:   [0.431, 0.071, 0.031], // #6E1208 — cinnabar red (seal-ink depth)
+    secondary: [0.753, 0.204, 0.094], // #C03418 — bright orange-red bleed at edges
+  },
+  {
+    name: 'Pine',
+    primary:   [0.118, 0.227, 0.141], // #1E3A24 — deep pine-shadow green
+    secondary: [0.239, 0.439, 0.271], // #3D7045 — lighter moss-needle at edges
+  },
+  {
+    name: 'Prussian',
+    primary:   [0.055, 0.122, 0.227], // #0E1F3A — near-black Prussian blue (Hokusai)
+    secondary: [0.102, 0.282, 0.439], // #1A4870 — steel-blue bleed at edges
   },
 ] as const;
 
