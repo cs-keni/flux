@@ -2,6 +2,18 @@
 
 ## 2026-06-30
 
+### Phase 5 — palette crossfade animation
+
+**Files changed:** `src/sim/FluidSim.ts`
+
+Four `Float32Array(3)` fields track `currentPrimary/Secondary` (what the render pass sees) and `targetPrimary/Secondary` (the selected palette). Each `step()` call advances current toward target via exponential approach: `alpha = 1 - exp(-6 * dt_sec)`, giving ~95% completion in 500ms. Frame-rate-independent.
+
+Spam behavior: each `setPalette()` call only redirects `target`; `current` continues from wherever it is — no debounce, no broken state. Pressing 4→5→6 rapidly produces a smooth color drift to Prussian Blue.
+
+`exportHighRes()` untouched — it reads `PALETTES[paletteIndex].primary` directly (the target color), so exports always use the final settled color.
+
+---
+
 ### Phase 5 — three additional ink palettes (keys 4/5/6)
 
 **Files changed:** `src/sim/config.ts`, `src/main.ts`, `src/ui/ShortcutOverlay.ts`

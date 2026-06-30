@@ -73,6 +73,12 @@ export class FluidSim {
   private pendingSplats: SplatEvent[] = [];
   private paletteIndex: number = 0;
 
+  // Palette crossfade — current values lerp toward target each step()
+  private currentPrimary   = new Float32Array(3);
+  private currentSecondary = new Float32Array(3);
+  private targetPrimary    = new Float32Array(3);
+  private targetSecondary  = new Float32Array(3);
+
   constructor(gl: WebGL2RenderingContext, config: SimConfig, mobile: boolean) {
     this.gl = gl;
     this.config = config;
@@ -89,6 +95,13 @@ export class FluidSim {
 
     // D9: check for linear filtering on half-float textures
     this.linearFiltering = !!gl.getExtension('OES_texture_float_linear');
+
+    // Settle palette transition to starting palette (handles context restore correctly)
+    const initPal = PALETTES[this.paletteIndex];
+    this.currentPrimary.set(initPal.primary);
+    this.currentSecondary.set(initPal.secondary);
+    this.targetPrimary.set(initPal.primary);
+    this.targetSecondary.set(initPal.secondary);
 
     this.fboManager = new FBOManager(gl);
     this.buildFBOs();
@@ -147,6 +160,13 @@ export class FluidSim {
     const elapsedSec = Math.min(elapsed, frameCapMs) / 1000;
     const dissipation = Math.pow(0.999, elapsedSec * 60);
 
+    // Palette crossfade: exponential approach, ~95% complete in 0.5s
+    const palAlpha = 1.0 - Math.exp(-6.0 * elapsedSec);
+    for (let i = 0; i < 3; i++) {
+      this.currentPrimary[i]   += (this.targetPrimary[i]   - this.currentPrimary[i])   * palAlpha;
+      this.currentSecondary[i] += (this.targetSecondary[i] - this.currentSecondary[i]) * palAlpha;
+    }
+
     gl.bindVertexArray(this.quadVAO);
     gl.viewport(0, 0, resolution, resolution);
 
@@ -190,7 +210,6 @@ export class FluidSim {
 
   render(idleSeconds: number = 0): void {
     const gl = this.gl;
-    const palette = PALETTES[this.paletteIndex];
 
     gl.bindVertexArray(this.quadVAO);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -203,8 +222,8 @@ export class FluidSim {
     gl.bindTexture(gl.TEXTURE_2D, this.dye.read.texture);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.velocity.read.texture);
-    gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkPrimary'), palette.primary);
-    gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkSecondary'), palette.secondary);
+    gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkPrimary'), this.currentPrimary);
+    gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkSecondary'), this.currentSecondary);
     gl.uniform1f(gl.getUniformLocation(this.renderProgram, 'u_idleTime'), idleSeconds);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
@@ -230,10 +249,16 @@ export class FluidSim {
 
   setPalette(index: number): void {
     this.paletteIndex = ((index % PALETTES.length) + PALETTES.length) % PALETTES.length;
+    const p = PALETTES[this.paletteIndex];
+    this.targetPrimary.set(p.primary);
+    this.targetSecondary.set(p.secondary);
   }
 
   cyclePalette(): void {
     this.paletteIndex = (this.paletteIndex + 1) % PALETTES.length;
+    const p = PALETTES[this.paletteIndex];
+    this.targetPrimary.set(p.primary);
+    this.targetSecondary.set(p.secondary);
   }
 
   onResize(): void {
