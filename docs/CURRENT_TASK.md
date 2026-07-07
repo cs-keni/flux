@@ -39,8 +39,22 @@ All Phase 3 deliverables shipped (minus the two explicitly deferred to Phase 4):
 - [x] Palette crossfade (~500ms exponential lerp)
 - [x] Deploy: https://flux-indol-gamma.vercel.app/ (auto-deploys on push)
 
-### Now: Phase 5 — next item TBD
+### Phase 5 — palettes complete
 - [x] Vermilion (#6E1208 cinnabar, key 4)
 - [x] Pine (#1E3A24 forest green, key 5)
 - [x] Prussian Blue (#0E1F3A Hokusai blue, key 6)
 - Keys 4/5/6 wired; ShortcutOverlay updated to show 1–6
+
+### Just completed: Shareable link
+- [x] URL hash `#p=<idx>&s=<name>` encodes palette + auto-pilot sequence
+- [x] `src/share/shareLink.ts` — parse/build/lookup (14 unit tests)
+- [x] Parses on load → applies palette + starts sequence (non-forced)
+- [x] Live-updates hash via `history.replaceState` on palette/sequence change
+- [x] `C` key copies `location.href` to clipboard
+- Verified end-to-end via browse (palette + auto-start + live hash)
+
+### Next Phase 5 candidates (from checkpoint backlog)
+- [ ] Gallery: last 5 sessions in localStorage (medium)
+- [ ] Dynamic resolution downgrade on jank
+- [ ] Watercolor material mode (shader-only)
+- [ ] WebGPU upgrade (large, Phase 6)

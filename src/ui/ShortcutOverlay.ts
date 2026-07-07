@@ -10,6 +10,7 @@ const ROWS: [string, string][] = [
   ['P',          'cycle palette'],
   ['R',          'reset canvas'],
   ['S',          'save PNG'],
+  ['C',          'copy link'],
   ['A',          'auto-pilot'],
 ];
 

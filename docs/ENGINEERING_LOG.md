@@ -1,5 +1,27 @@
 # Engineering Log
 
+## 2026-07-07
+
+### Phase 5 — shareable link (URL hash → palette + auto-pilot sequence)
+
+**Commit:** `8700227`
+
+**Files changed:** `src/share/shareLink.ts` (new), `src/sim/FluidSim.ts`, `src/main.ts`, `src/ui/ShortcutOverlay.ts`, `tests/unit/shareLink.test.ts` (new)
+
+The URL hash now encodes viewer state so a link reproduces what the sender sees:
+`#p=<paletteIndex>&s=<sequenceName>` (e.g. `#p=3&s=enso`).
+
+- **`src/share/shareLink.ts`** — pure, testable module. `parseShareHash()` uses `URLSearchParams`, validates the palette index against `PALETTES.length` and the sequence name against `SEQUENCES` (unknown/out-of-range values are dropped, never thrown — a stale or hand-edited link degrades gracefully). `buildShareHash()` is the inverse; `sequenceIndexByName()` maps a name → SEQUENCES index.
+- **`FluidSim.getPaletteIndex()`** — new getter so `main.ts` can read the current palette when building the hash (palette index was private).
+- **`main.ts`** — on load (interactive path only, after the headless early-return) parses `location.hash`: applies the palette, and if a sequence is named, sets `autoPilotSeqIdx` and calls `startAutoPilot()` immediately (non-forced, so the visitor's first interaction hands control back). The hash live-updates via `history.replaceState` (not `location.hash =`, to avoid history spam and hashchange events) on every palette change (`applyPalette`/`cyclePalette` wrappers) and on sequence start (in `startAutoPilot`). New `C` shortcut copies `location.href` to the clipboard and flashes "link copied." (`flashSaved` generalized to `flashToast(text)`).
+- **`ShortcutOverlay`** — added the `C · copy link` row.
+
+**Verified:** type-check clean, 28 unit tests pass (14 new), production build clean. Drove the live app via `browse` at `#p=3&s=enso`: hash round-tripped, ink rendered in Vermilion, auto-pilot started with no user input; pressing `1`/`p` live-updated the hash to `p=0`/`p=1`; `C` produced the correct `location.href`.
+
+**Note:** in headless Chromium the auto-pilot renders as scattered dots rather than a smooth arc — that's the documented ~4fps rAF throttling (sequence samples at wall-clock time), not a bug. Real 60fps browsers draw a continuous stroke.
+
+---
+
 ## 2026-06-30
 
 ### Phase 5 — deploy to Vercel

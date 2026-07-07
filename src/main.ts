@@ -4,6 +4,7 @@ import { isHeadless, REPLAY_SEQUENCE, REPLAY_TOTAL_FRAMES } from './sim/headless
 import { SEQUENCES, getAutoPilotSplat, AutoPilotSequence } from './autopilot/sequences';
 import { HintOverlay } from './ui/HintOverlay';
 import { ShortcutOverlay } from './ui/ShortcutOverlay';
+import { parseShareHash, buildShareHash, sequenceIndexByName } from './share/shareLink';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
@@ -40,9 +41,9 @@ function resizeCanvas(canvas: HTMLCanvasElement): void {
   }
 }
 
-function flashSaved(): void {
+function flashToast(text: string): void {
   const el = document.createElement('div');
-  el.textContent = 'saved.';
+  el.textContent = text;
   el.style.cssText = `
     position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
     font-family:Georgia,'Times New Roman',serif;font-size:0.78rem;
@@ -87,12 +88,35 @@ async function init(): Promise<void> {
 
   const IDLE_AUTOPILOT_MS = 30_000;
 
+  // Shareable-link state — reflected live into location.hash so the address bar
+  // always holds a link that reproduces the current palette + last sequence.
+  let currentSequenceName: string | null = null;
+
+  function syncShareUrl(): void {
+    const hash = buildShareHash(sim.getPaletteIndex(), currentSequenceName);
+    // replaceState (not location.hash =) so we don't spam browser history or
+    // trigger a hashchange event on every palette tap.
+    history.replaceState(null, '', hash);
+  }
+
+  function applyPalette(index: number): void {
+    sim.setPalette(index);
+    syncShareUrl();
+  }
+
+  function cyclePalette(): void {
+    sim.cyclePalette();
+    syncShareUrl();
+  }
+
   function startAutoPilot(): void {
     autoPilotSeq = SEQUENCES[autoPilotSeqIdx % SEQUENCES.length];
     autoPilotSeqIdx++;
     autoPilotStartTime = performance.now();
     autoPilotPrevPos = null;
     autoPilotActive = true;
+    currentSequenceName = autoPilotSeq.name;
+    syncShareUrl();
     hint.hideForAutoPilot();
     sim.reset();
   }
@@ -138,13 +162,13 @@ async function init(): Promise<void> {
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     shortcuts.dismiss();
-    if (e.key === '1') sim.setPalette(0);
-    if (e.key === '2') sim.setPalette(1);
-    if (e.key === '3') sim.setPalette(2);
-    if (e.key === '4') sim.setPalette(3);
-    if (e.key === '5') sim.setPalette(4);
-    if (e.key === '6') sim.setPalette(5);
-    if (e.key === 'p' || e.key === 'P') sim.cyclePalette();
+    if (e.key === '1') applyPalette(0);
+    if (e.key === '2') applyPalette(1);
+    if (e.key === '3') applyPalette(2);
+    if (e.key === '4') applyPalette(3);
+    if (e.key === '5') applyPalette(4);
+    if (e.key === '6') applyPalette(5);
+    if (e.key === 'p' || e.key === 'P') cyclePalette();
     if (e.key === 'r' || e.key === 'R') {
       stopAutoPilot();
       sim.reset();
@@ -157,14 +181,14 @@ async function init(): Promise<void> {
         link.download = `flux-${Date.now()}.png`;
         link.href = url;
         link.click();
-        flashSaved();
+        flashToast('saved.');
       } catch {
         // Offscreen WebGL failed — fall back to current display canvas
         const link = document.createElement('a');
         link.download = `flux-${Date.now()}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
-        flashSaved();
+        flashToast('saved.');
       }
     }
     if (e.key === 'a' || e.key === 'A') {
@@ -175,6 +199,13 @@ async function init(): Promise<void> {
         autoPilotForced = true;
         startAutoPilot();
       }
+    }
+    if (e.key === 'c' || e.key === 'C') {
+      // Copy a shareable link to the current palette + last sequence.
+      syncShareUrl();
+      navigator.clipboard?.writeText(location.href)
+        .then(() => flashToast('link copied.'))
+        .catch(() => { /* clipboard blocked (insecure context / permission) — no-op */ });
     }
   });
 
@@ -199,6 +230,21 @@ async function init(): Promise<void> {
     }
     document.documentElement.dataset['simReady'] = 'true';
     return;
+  }
+
+  // ── Shareable link: apply palette + sequence from the URL hash ───────────
+  // A link like #p=3&s=enso pre-selects the palette and starts that sequence
+  // immediately (non-forced, so the visitor's first interaction takes over).
+  {
+    const shared = parseShareHash(location.hash);
+    if (shared.palette !== undefined) applyPalette(shared.palette);
+    if (shared.sequence !== undefined) {
+      autoPilotSeqIdx = sequenceIndexByName(shared.sequence);
+      startAutoPilot();
+    } else {
+      // No sequence to play — still normalize the hash to current palette.
+      syncShareUrl();
+    }
   }
 
   // ── Main render loop ─────────────────────────────────────────────────────

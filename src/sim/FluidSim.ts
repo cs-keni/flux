@@ -261,6 +261,10 @@ export class FluidSim {
     this.targetSecondary.set(p.secondary);
   }
 
+  getPaletteIndex(): number {
+    return this.paletteIndex;
+  }
+
   onResize(): void {
     // FBO resolution stays fixed (D4); canvas CSS handles display scaling
   }

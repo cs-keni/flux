@@ -183,7 +183,11 @@ No paper layer. Dye displayed raw to verify sim correctness.
   - Abstract solver behind `GpuBackend` interface now (TODOS.md item)
 - [ ] "Watercolor" material mode: lighter, more transparent, different feather curve
 - [ ] Gallery: last 5 sessions in localStorage
-- [ ] Shareable link: URL hash encodes auto-pilot sequence + palette
+- [x] Shareable link: URL hash encodes auto-pilot sequence + palette (`#p=<idx>&s=<name>`)
+  - Parses on load → applies palette + starts that sequence (non-forced)
+  - Live-updates via `history.replaceState` on palette change and sequence start
+  - `C` key copies `location.href` to clipboard (flash "link copied.")
+  - Pure module `src/share/shareLink.ts` + 14 unit tests
 - [ ] Sound reactivity: mic input → auto-pilot speed or injection force
 - [ ] Dynamic resolution downgrade: monitor frame time, drop tier if avg > 20ms
 
