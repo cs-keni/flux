@@ -4,7 +4,7 @@
 
 ### Phase 5 — shareable link (URL hash → palette + auto-pilot sequence)
 
-**Commit:** `8700227`
+**Commit:** `858e3b8`
 
 **Files changed:** `src/share/shareLink.ts` (new), `src/sim/FluidSim.ts`, `src/main.ts`, `src/ui/ShortcutOverlay.ts`, `tests/unit/shareLink.test.ts` (new)
 
