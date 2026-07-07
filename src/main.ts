@@ -5,6 +5,8 @@ import { SEQUENCES, getAutoPilotSplat, AutoPilotSequence } from './autopilot/seq
 import { HintOverlay } from './ui/HintOverlay';
 import { ShortcutOverlay } from './ui/ShortcutOverlay';
 import { parseShareHash, buildShareHash, sequenceIndexByName } from './share/shareLink';
+import { GalleryOverlay } from './ui/GalleryOverlay';
+import { loadGallery, captureToGallery, decodeEntry, resampleField, GalleryEntry } from './gallery/gallery';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
@@ -140,6 +142,52 @@ async function init(): Promise<void> {
 
   new InputHandler(canvas, sim, onUserInput);
 
+  // ── Gallery ───────────────────────────────────────────────────────────────
+  let galleryOpen = false;
+  let galleryEntries: GalleryEntry[] = [];
+
+  async function selectGalleryEntry(i: number): Promise<void> {
+    const entry = galleryEntries[i];
+    if (!entry) return;
+    closeGallery();
+    try {
+      const field = await decodeEntry(entry);
+      const restored = resampleField(field, entry.size, config.resolution);
+      stopAutoPilot();
+      sim.restoreDyeField(restored, config.resolution);
+      applyPalette(entry.paletteIndex);
+      lastInputTime = performance.now();
+      hint.onInput();
+    } catch {
+      flashToast('could not open that one.');
+    }
+  }
+
+  const gallery = new GalleryOverlay(
+    (i) => { void selectGalleryEntry(i); },
+    () => closeGallery(),
+  );
+
+  function openGallery(): void {
+    galleryEntries = loadGallery();
+    if (galleryEntries.length === 0) { flashToast('gallery is empty.'); return; }
+    gallery.show(galleryEntries);
+    galleryOpen = true;
+  }
+
+  function closeGallery(): void {
+    if (!galleryOpen) return;
+    gallery.hide();
+    galleryOpen = false;
+  }
+
+  // Snapshot the current canvas into the gallery (blank canvases are skipped
+  // inside captureToGallery). Called on user reset and on navigate-away.
+  function captureCurrent(): void {
+    const { data, size } = sim.readDyeField();
+    captureToGallery(data, size, sim.getPaletteIndex());
+  }
+
   let pendingResize = false;
   window.addEventListener('resize', () => { pendingResize = true; });
 
@@ -155,12 +203,22 @@ async function init(): Promise<void> {
     if (document.hidden) sim.pause(); else sim.resume();
   });
 
+  // Archive the final painting when the user navigates away / closes the tab.
+  window.addEventListener('pagehide', () => { captureCurrent(); });
+
   if (import.meta.env.DEV) {
     initDevOverlay(config);
   }
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
+    // When the gallery is open it owns the keyboard: 1–N select, anything else closes.
+    if (galleryOpen) {
+      const n = e.key.charCodeAt(0) - 49; // '1' → 0
+      if (n >= 0 && n < galleryEntries.length) void selectGalleryEntry(n);
+      else closeGallery();
+      return;
+    }
     shortcuts.dismiss();
     if (e.key === '1') applyPalette(0);
     if (e.key === '2') applyPalette(1);
@@ -170,10 +228,12 @@ async function init(): Promise<void> {
     if (e.key === '6') applyPalette(5);
     if (e.key === 'p' || e.key === 'P') cyclePalette();
     if (e.key === 'r' || e.key === 'R') {
+      captureCurrent();  // archive what's on the canvas before clearing it
       stopAutoPilot();
       sim.reset();
       hint.onInput();
     }
+    if (e.key === 'g' || e.key === 'G') openGallery();
     if (e.key === 's' || e.key === 'S') {
       try {
         const url = sim.exportHighRes(2048);

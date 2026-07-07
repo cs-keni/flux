@@ -2,6 +2,28 @@
 
 ## 2026-07-07
 
+### Phase 5 — gallery (last 5 paintings, localStorage, live restore)
+
+**Files changed:** `src/gallery/gallery.ts` (new), `src/ui/GalleryOverlay.ts` (new), `src/sim/FluidSim.ts`, `src/main.ts`, `src/ui/ShortcutOverlay.ts`, `tests/unit/gallery.test.ts` (new)
+
+Press **G** to summon a grid of your last 5 paintings; press **1–5** or click to restore one as a *live* simulation you can keep painting on; any other key / backdrop click dismisses.
+
+**Storage design.** We do not store the rendered image. We store the raw dye ink-concentration field (the sim's R channel) packed into the **alpha** channel of a grayscale PNG. Ink is sparse, so PNG compresses each painting to ~30KB (measured) — five fit easily in the ~5MB localStorage budget. That one PNG does double duty: it's the restore data *and* the overlay thumbnail (used as a CSS `mask` filled with the entry's palette primary over paper, so no separate render pass). Concentration maps to alpha via a fixed ceiling `CONCENTRATION_MAX = 4.0` (render saturates ~1.5, so 8-bit is visually lossless). Blank canvases are skipped below `MIN_COVERAGE` (0.4% inked).
+
+**Row-order contract.** FBO read/upload works in GL order (row 0 = bottom); PNGs are image order (row 0 = top). `encodeField`/`decodeEntry` own the single paired Y-flip, so `FluidSim` never thinks about it. Verified upright in the browser (painted a U, thumbnail + restore both showed U, not ∩).
+
+**FluidSim additions.** `readDyeField()` — `readPixels` the dye FBO, return the R channel at sim resolution. `restoreDyeField(field, size)` — upload the field back into the dye texture (FLOAT → RGBA16F) and clear velocity/pressure/divergence so the painting resumes calm and paintable rather than mid-motion. Cross-tier safety: `main` resamples (`resampleField`, bilinear) if a saved painting's resolution differs from the current sim resolution.
+
+**Capture triggers.** On **R** (archive then clear) and on **pagehide** (navigate-away). Auto-pilot's internal resets do *not* capture — only user-initiated clears and navigate-away.
+
+**main.ts wiring.** Gallery open/close state; when open the overlay owns the keyboard (1–N select, else close) so digits don't leak to palette selection. `selectGalleryEntry` decodes → resamples → `restoreDyeField` → restores the saved palette too → hides overlay.
+
+**Verified:** type-check clean, 46 unit tests pass (18 new), build clean. Full loop driven via `browse`: painted a stroke → **R** captured a 33KB/512px/palette-0 entry and cleared → **G** rendered the animated overlay with correctly-oriented palette-tinted thumbnails → **1** restored the live dye field with no console errors. `pagehide` capture also confirmed (count reached 2 across a navigation).
+
+**Note (unit-test scope):** encode/decode use canvas `toDataURL`/`getImageData`, which jsdom doesn't implement, so those are covered by the browse run, not Vitest. Vitest covers the pure helpers (quantize, coverage, capEntries, resampleField, loadGallery JSON-safety).
+
+---
+
 ### Phase 5 — shareable link (URL hash → palette + auto-pilot sequence)
 
 **Commit:** `858e3b8`

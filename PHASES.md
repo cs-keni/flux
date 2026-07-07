@@ -182,7 +182,12 @@ No paper layer. Dye displayed raw to verify sim correctness.
 - [ ] WebGPU upgrade: compute shaders for 50+ Jacobi iterations
   - Abstract solver behind `GpuBackend` interface now (TODOS.md item)
 - [ ] "Watercolor" material mode: lighter, more transparent, different feather curve
-- [ ] Gallery: last 5 sessions in localStorage
+- [x] Gallery: last 5 paintings in localStorage — G key overlay, live restore
+  - Stores the dye R field packed into PNG alpha (~30KB each, sparse ink compresses well)
+  - Same PNG is both restore data AND CSS-mask thumbnail (tinted with saved palette)
+  - Restore uploads the field back into the dye FBO, clears velocity (resumes calm/paintable)
+  - Captures on R (before clear) + on pagehide; blank canvases skipped (MIN_COVERAGE)
+  - Pure helpers unit-tested; full paint→capture→restore loop verified via browse
 - [x] Shareable link: URL hash encodes auto-pilot sequence + palette (`#p=<idx>&s=<name>`)
   - Parses on load → applies palette + starts that sequence (non-forced)
   - Live-updates via `history.replaceState` on palette change and sequence start

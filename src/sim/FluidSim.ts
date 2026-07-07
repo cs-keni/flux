@@ -265,6 +265,56 @@ export class FluidSim {
     return this.paletteIndex;
   }
 
+  // ── Gallery: read / restore the ink-concentration (dye) field ─────────────
+  // Only the R channel carries ink concentration (see splat/advect passes).
+  // Both methods work in GL readPixels order (row 0 = bottom); the gallery
+  // module owns the flip to image order when it serializes to a PNG.
+
+  // Read the current dye field at sim resolution. Returns the R channel only.
+  readDyeField(): { data: Float32Array; size: number } {
+    const gl = this.gl;
+    const { resolution } = this.config;
+    const rgba = new Float32Array(resolution * resolution * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.dye.read.framebuffer);
+    gl.readPixels(0, 0, resolution, resolution, gl.RGBA, gl.FLOAT, rgba);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    const data = new Float32Array(resolution * resolution);
+    for (let i = 0; i < data.length; i++) data[i] = rgba[i * 4];
+    return { data, size: resolution };
+  }
+
+  // Restore an ink-concentration field into the dye FBO. `field` must already
+  // be at sim resolution (caller resamples). Velocity/pressure are cleared so
+  // the painting resumes calm and paintable rather than mid-motion.
+  restoreDyeField(field: Float32Array, size: number): void {
+    const gl = this.gl;
+    const { resolution } = this.config;
+    if (size !== resolution || field.length !== resolution * resolution) return;
+
+    // Pack R = concentration, GBA = 0. Upload FLOAT data into the RGBA16F
+    // dye texture (WebGL 2 converts to half-float on store).
+    const rgba = new Float32Array(resolution * resolution * 4);
+    for (let i = 0; i < resolution * resolution; i++) rgba[i * 4] = field[i];
+
+    gl.bindTexture(gl.TEXTURE_2D, this.dye.read.texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, resolution, resolution, 0, gl.RGBA, gl.FLOAT, rgba);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    const clear = (fb: WebGLFramebuffer) => {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    };
+    clear(this.velocity.read.framebuffer);
+    clear(this.velocity.write.framebuffer);
+    clear(this.dye.write.framebuffer);
+    clear(this.pressure.read.framebuffer);
+    clear(this.pressure.write.framebuffer);
+    clear(this.divergence.framebuffer);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
   onResize(): void {
     // FBO resolution stays fixed (D4); canvas CSS handles display scaling
   }

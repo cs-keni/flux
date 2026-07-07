@@ -11,6 +11,7 @@ const ROWS: [string, string][] = [
   ['R',          'reset canvas'],
   ['S',          'save PNG'],
   ['C',          'copy link'],
+  ['G',          'gallery'],
   ['A',          'auto-pilot'],
 ];
 

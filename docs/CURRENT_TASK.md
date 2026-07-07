@@ -45,16 +45,21 @@ All Phase 3 deliverables shipped (minus the two explicitly deferred to Phase 4):
 - [x] Prussian Blue (#0E1F3A Hokusai blue, key 6)
 - Keys 4/5/6 wired; ShortcutOverlay updated to show 1–6
 
-### Just completed: Shareable link
+### Done: Shareable link
 - [x] URL hash `#p=<idx>&s=<name>` encodes palette + auto-pilot sequence
 - [x] `src/share/shareLink.ts` — parse/build/lookup (14 unit tests)
 - [x] Parses on load → applies palette + starts sequence (non-forced)
-- [x] Live-updates hash via `history.replaceState` on palette/sequence change
-- [x] `C` key copies `location.href` to clipboard
-- Verified end-to-end via browse (palette + auto-start + live hash)
+- [x] Live-updates hash via `history.replaceState`; `C` copies link
+
+### Just completed: Gallery (last 5 paintings, live restore)
+- [x] `G` key → animated overlay of up to 5 saved paintings; 1–5 / click to restore
+- [x] `src/gallery/gallery.ts` — dye R field → PNG alpha (~30KB), load/save/encode/decode/resample (18 unit tests)
+- [x] `src/ui/GalleryOverlay.ts` — staggered fade-in thumbnails, palette-tinted via CSS mask
+- [x] `FluidSim.readDyeField()` / `restoreDyeField()` — restore uploads field, clears velocity
+- [x] Captures on R (before clear) + pagehide; blanks skipped below MIN_COVERAGE
+- Verified end-to-end via browse: paint → R (capture+clear) → G (overlay) → 1 (live restore)
 
 ### Next Phase 5 candidates (from checkpoint backlog)
-- [ ] Gallery: last 5 sessions in localStorage (medium)
-- [ ] Dynamic resolution downgrade on jank
+- [ ] Dynamic resolution downgrade on jank (monitor frame time, drop tier)
 - [ ] Watercolor material mode (shader-only)
 - [ ] WebGPU upgrade (large, Phase 6)
