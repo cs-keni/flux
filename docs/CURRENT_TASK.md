@@ -66,7 +66,16 @@ All Phase 3 deliverables shipped (minus the two explicitly deferred to Phase 4):
 - [x] main.ts rAF loop feeds raw frame delta; downgrade preserves painting (resample)
 - Verified via DEV `__fluxForceDowngrade` (tree-shaken from prod): 512→256 kept the stroke, floored at 256
 
+### Just completed: Watercolor material mode (W key)
+- [x] `u_material` uniform in render.frag.glsl: transparent washes, softer feather, wet-edge rim, granulation
+- [x] Material crossfade in FluidSim (~400ms, mirrors palette); setMaterial/toggleMaterial/getMaterialIndex
+- [x] Persists: share hash `&m=1`, gallery entry `material` field, export renders current
+- [x] W key toggles (flashes label); added to ShortcutOverlay; on-load hash applies material
+- Verified via browse: sumi↔watercolor distinct (rim visible), hash + gallery round-trip material (6 new tests)
+
 ### Next Phase 5 candidates
-- [ ] Watercolor material mode (shader-only: lighter feather, more transparent, different FBM)
-- [ ] Sound reactivity: mic → auto-pilot speed / injection force
+- [ ] Sound reactivity: mic → auto-pilot speed / injection force (needs mic-permission UX)
 - [ ] WebGPU upgrade (large, Phase 6)
+
+### Keyboard shortcuts (current)
+1–6 palette · P cycle · R reset(+gallery capture) · S save PNG · C copy link · G gallery · W watercolor · A auto-pilot · F fps(dev)

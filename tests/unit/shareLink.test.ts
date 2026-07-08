@@ -35,6 +35,16 @@ describe('parseShareHash()', () => {
     expect(parseShareHash('#s=ENSO')).toEqual({ sequence: 'enso' });
   });
 
+  it('parses material 0 and 1', () => {
+    expect(parseShareHash('#p=0&m=1')).toEqual({ palette: 0, material: 1 });
+    expect(parseShareHash('#p=0&m=0')).toEqual({ palette: 0, material: 0 });
+  });
+
+  it('drops an out-of-range material', () => {
+    expect(parseShareHash('#m=2')).toEqual({});
+    expect(parseShareHash('#m=foo')).toEqual({});
+  });
+
   it('accepts the last palette index (boundary)', () => {
     const last = PALETTES.length - 1;
     expect(parseShareHash(`#p=${last}`)).toEqual({ palette: last });
@@ -51,9 +61,20 @@ describe('buildShareHash()', () => {
     expect(buildShareHash(0)).toBe('#p=0');
   });
 
+  it('encodes material only when watercolor (1), never when sumi (0)', () => {
+    expect(buildShareHash(3, 'enso', 1)).toBe('#p=3&s=enso&m=1');
+    expect(buildShareHash(3, 'enso', 0)).toBe('#p=3&s=enso');
+    expect(buildShareHash(3, null, 1)).toBe('#p=3&m=1');
+  });
+
   it('round-trips through parseShareHash', () => {
     const hash = buildShareHash(4, 'mountain');
     expect(parseShareHash(hash)).toEqual({ palette: 4, sequence: 'mountain' });
+  });
+
+  it('round-trips material through parseShareHash', () => {
+    const hash = buildShareHash(2, 'wave', 1);
+    expect(parseShareHash(hash)).toEqual({ palette: 2, sequence: 'wave', material: 1 });
   });
 });
 

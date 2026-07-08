@@ -96,7 +96,7 @@ async function init(): Promise<void> {
   let currentSequenceName: string | null = null;
 
   function syncShareUrl(): void {
-    const hash = buildShareHash(sim.getPaletteIndex(), currentSequenceName);
+    const hash = buildShareHash(sim.getPaletteIndex(), currentSequenceName, sim.getMaterialIndex());
     // replaceState (not location.hash =) so we don't spam browser history or
     // trigger a hashchange event on every palette tap.
     history.replaceState(null, '', hash);
@@ -157,6 +157,8 @@ async function init(): Promise<void> {
       stopAutoPilot();
       sim.restoreDyeField(restored, sim.getResolution());
       applyPalette(entry.paletteIndex);
+      sim.setMaterial(entry.material ?? 0);
+      syncShareUrl();
       lastInputTime = performance.now();
       hint.onInput();
     } catch {
@@ -186,7 +188,7 @@ async function init(): Promise<void> {
   // inside captureToGallery). Called on user reset and on navigate-away.
   function captureCurrent(): void {
     const { data, size } = sim.readDyeField();
-    captureToGallery(data, size, sim.getPaletteIndex());
+    captureToGallery(data, size, sim.getPaletteIndex(), sim.getMaterialIndex());
   }
 
   // ── Adaptive resolution ─────────────────────────────────────────────────
@@ -291,6 +293,11 @@ async function init(): Promise<void> {
         .then(() => flashToast('link copied.'))
         .catch(() => { /* clipboard blocked (insecure context / permission) — no-op */ });
     }
+    if (e.key === 'w' || e.key === 'W') {
+      sim.toggleMaterial();
+      syncShareUrl();
+      flashToast(sim.getMaterialIndex() === 1 ? 'watercolor.' : 'sumi ink.');
+    }
   });
 
   try {
@@ -322,6 +329,7 @@ async function init(): Promise<void> {
   {
     const shared = parseShareHash(location.hash);
     if (shared.palette !== undefined) applyPalette(shared.palette);
+    if (shared.material !== undefined) sim.setMaterial(shared.material);
     if (shared.sequence !== undefined) {
       autoPilotSeqIdx = sequenceIndexByName(shared.sequence);
       startAutoPilot();

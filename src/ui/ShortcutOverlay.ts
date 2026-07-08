@@ -12,6 +12,7 @@ const ROWS: [string, string][] = [
   ['S',          'save PNG'],
   ['C',          'copy link'],
   ['G',          'gallery'],
+  ['W',          'watercolor'],
   ['A',          'auto-pilot'],
 ];
 

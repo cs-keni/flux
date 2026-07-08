@@ -5,7 +5,9 @@
 //   p = palette index   (0 .. PALETTES.length-1)
 //   s = auto-pilot name  (a SEQUENCES[].name, e.g. "enso")
 //
-// e.g.  https://flux.example/#p=3&s=enso
+// e.g.  https://flux.example/#p=3&s=enso&m=1
+//
+//   m = material (0 = sumi ink, 1 = watercolor); omitted when 0.
 //
 // Parsing is defensive: unknown or out-of-range values are dropped, never
 // thrown. A hand-edited or stale link degrades to "apply what's valid, ignore
@@ -17,6 +19,7 @@ import { SEQUENCES } from '../autopilot/sequences';
 export interface ShareParams {
   palette?: number;   // validated index into PALETTES
   sequence?: string;  // validated (lowercase) SEQUENCES name
+  material?: number;  // 0 or 1
 }
 
 // Parse a location.hash ("#p=3&s=enso" or "p=3&s=enso") into validated params.
@@ -43,15 +46,26 @@ export function parseShareHash(hash: string): ShareParams {
     }
   }
 
+  const m = params.get('m');
+  if (m === '0' || m === '1') {
+    result.material = Number(m);
+  }
+
   return result;
 }
 
-// Build a "#p=3&s=enso" fragment from current state. Sequence is omitted when
-// none has played yet (link is just a palette).
-export function buildShareHash(palette: number, sequence?: string | null): string {
+// Build a "#p=3&s=enso&m=1" fragment from current state. Sequence is omitted
+// when none has played yet; material is omitted when 0 (default) to keep the
+// common URL clean.
+export function buildShareHash(
+  palette: number,
+  sequence?: string | null,
+  material?: number,
+): string {
   const params = new URLSearchParams();
   params.set('p', String(palette));
   if (sequence) params.set('s', sequence);
+  if (material === 1) params.set('m', '1');
   return '#' + params.toString();
 }
 

@@ -9,6 +9,7 @@ uniform sampler2D u_velocity;  // velocity field for directional feather (Phase 
 uniform vec3 u_inkPrimary;     // ink color at full concentration
 uniform vec3 u_inkSecondary;   // edge bleed hue at thin ink margins
 uniform float u_idleTime;      // seconds since last user input (for ink-dry animation)
+uniform float u_material;      // 0 = sumi ink, 1 = watercolor (crossfades between)
 
 // ── 2D hash noise ────────────────────────────────────────────────────────────
 
@@ -100,19 +101,45 @@ void main() {
   vec3 driedPrimary = u_inkPrimary * 0.88 + vec3(-0.006, -0.003, 0.010);
   vec3 effectivePrimary = mix(u_inkPrimary, driedPrimary, dryFactor);
 
-  // Edges sharpen as moisture evaporates: k rises from 3.0 → 3.8
-  float kFactor = mix(3.0, 3.8, dryFactor);
+  // Edges sharpen as moisture evaporates: k rises from 3.0 → 3.8 (sumi).
+  // Watercolor stays soft: a lower k gives a wider, more gradual feather so
+  // washes read as transparent pigment rather than dense ink.
+  float kSumi  = mix(3.0, 3.8, dryFactor);
+  float kWater = mix(1.8, 2.4, dryFactor);
+  float kFactor = mix(kSumi, kWater, u_material);
 
   // Exponential feather: slow rise at low concentrations, asymptote near 1.
   // k=3.0: ink=0.1→26% opaque, ink=0.5→78%, ink=1.0→95% — long feather tail.
   float opacity = 1.0 - exp(-rawInk * kFactor);
+
+  // ── Watercolor wet-edge rim ───────────────────────────────────────────────
+  // Pigment migrates to the perimeter of a drying wash and pools there, so the
+  // rim is DARKER than the wash body — the signature watercolor tell, and the
+  // visual opposite of sumi's dense core + feathered edge. A band-pass on
+  // concentration isolates that boundary ring.
+  float rim = smoothstep(0.03, 0.20, rawInk) * (1.0 - smoothstep(0.20, 0.50, rawInk));
+  opacity += u_material * rim * 0.40;
+
+  // Transparent washes: watercolor never fully hides the paper, even at a dense
+  // core, so the paper glows through (luminosity is watercolor's whole appeal).
+  opacity *= mix(1.0, 0.85, u_material);
   opacity = clamp(opacity, 0.0, 1.0);
 
   // ── Secondary edge hue ────────────────────────────────────────────────────
   // At thin ink margins, secondary color bleeds in (paper fiber absorption).
-  // edgeFactor is 1 where ink is sparse, 0 where ink is dense.
+  // edgeFactor is 1 where ink is sparse, 0 where ink is dense. Watercolor
+  // pigments separate more at the edge, so the secondary bleed is stronger.
   float edgeFactor = 1.0 - smoothstep(0.05, 0.40, rawInk);
-  vec3 inkColor = mix(effectivePrimary, u_inkSecondary, edgeFactor * 0.55);
+  float edgeBlend = mix(0.55, 0.82, u_material);
+  vec3 inkColor = mix(effectivePrimary, u_inkSecondary, edgeFactor * edgeBlend);
+
+  // Granulation: watercolor pigment settles into paper valleys, leaving a
+  // mottled texture. Modulate ink by the same paper noise, watercolor only.
+  inkColor *= 1.0 - u_material * (noise - 0.5) * 0.16;
+
+  // The rim carries the densest, most-saturated pigment — nudge it toward the
+  // primary and darken slightly so the pooled ring reads.
+  inkColor = mix(inkColor, effectivePrimary * 0.85, u_material * rim * 0.6);
 
   // ── Composite: ink over paper ─────────────────────────────────────────────
   vec3 color = mix(paperColor, inkColor, opacity);

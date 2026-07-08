@@ -119,6 +119,19 @@ describe('loadGallery()', () => {
     expect(loadGallery()).toHaveLength(2);
   });
 
+  it('accepts pre-material entries (no material field)', () => {
+    // Back-compat: entries saved before watercolor mode have no material key.
+    localStorage.setItem(GALLERY_KEY, JSON.stringify([entry()]));
+    const loaded = loadGallery();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].material).toBeUndefined(); // caller defaults to 0
+  });
+
+  it('preserves a material field when present', () => {
+    localStorage.setItem(GALLERY_KEY, JSON.stringify([entry({ material: 1 })]));
+    expect(loadGallery()[0].material).toBe(1);
+  });
+
   it('caps a bloated store to MAX_ENTRIES', () => {
     const many = Array.from({ length: 9 }, (_, i) => entry({ timestamp: i }));
     localStorage.setItem(GALLERY_KEY, JSON.stringify(many));

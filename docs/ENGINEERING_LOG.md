@@ -2,6 +2,24 @@
 
 ## 2026-07-07
 
+### Phase 5 — watercolor material mode (W key)
+
+**Files changed:** `src/shaders/render.frag.glsl`, `src/sim/FluidSim.ts`, `src/share/shareLink.ts`, `src/gallery/gallery.ts`, `src/main.ts`, `src/ui/ShortcutOverlay.ts`, `tests/unit/shareLink.test.ts`, `tests/unit/gallery.test.ts`
+
+Press **W** to switch the painting medium between sumi ink and watercolor; it crossfades (~400ms) and persists with the artwork.
+
+**Shader** (`render.frag.glsl`) — one `u_material` uniform (0 = sumi, 1 = watercolor, continuous so it crossfades). Watercolor lerps in four traits: (1) softer/wider feather — `k` mixes from 3.0→1.8 (2.4 when dry); (2) transparent washes — opacity ceiling `×0.85` so paper glows through even a dense core; (3) the signature **wet-edge rim** — a band-pass on concentration (`smoothstep(0.03,0.20) × (1−smoothstep(0.20,0.50))`) isolates the drying boundary and darkens it, the visual opposite of sumi's dense-core/feathered-edge; (4) granulation — paper-noise mottles the pigment, and the rim nudges toward the denser primary. All effects scale by `u_material`, so at 0 the render is byte-identical to before.
+
+**Material crossfade** (`FluidSim`) — mirrors the palette crossfade exactly: `materialIndex`/`currentMaterial`/`targetMaterial`, lerped in `step()` at `1−exp(−8·dt)` (~95% in 0.4s). `setMaterial`/`toggleMaterial`/`getMaterialIndex`; `render()` feeds `currentMaterial`, `exportHighRes()` feeds the settled `targetMaterial` (like it uses the settled palette). `init()` settles both for context-restore.
+
+**Persist everywhere.** Share hash gains `&m=1` (omitted when sumi, to keep common URLs clean); `parseShareHash` validates `m ∈ {0,1}`; on-load applies it. Gallery entries gain an optional `material` field (absent on pre-watercolor entries → treated as 0); `captureToGallery` records it, restore calls `setMaterial(entry.material ?? 0)`. `main` threads material through `syncShareUrl`, the `W` handler (flashes "watercolor." / "sumi ink."), gallery capture/restore, and the on-load hash apply. `W` added to the shortcut overlay.
+
+**Verified:** type-check clean, 64 unit tests pass (6 new: material parse/build/round-trip + gallery back-compat), build clean. Via `browse` on a Prussian-blue ring: sumi = opaque uniform ink; `W` → watercolor with visible wet-edge rim, transparent luminous body, softer feather. `#p=5` → `#p=5&m=1` on toggle, drops `m` on toggle-back; gallery capture stored `material=1`, and restoring the entry brought the hash back to `m=1`. Palette preserved through every toggle, no console errors.
+
+**Browse-harness note (not a bug):** `goto` to the same origin only changes the hash (same-document nav), so the app doesn't reload and stale idle state fires auto-pilot. Force a real reload with a cache-buster (`?r=1#...`) when verifying share-link loads.
+
+---
+
 ### Phase 5 — dynamic resolution downgrade (adaptive tier on jank)
 
 **Files changed:** `src/sim/perfMonitor.ts` (new), `src/sim/config.ts`, `src/sim/FluidSim.ts`, `src/main.ts`, `src/dev/DevOverlay.ts`, `tests/unit/perfMonitor.test.ts` (new), `tests/unit/config.test.ts`

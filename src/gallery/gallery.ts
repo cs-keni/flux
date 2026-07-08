@@ -27,6 +27,7 @@ export interface GalleryEntry {
   png: string;         // dataURL; ink concentration lives in the alpha channel
   size: number;        // sim resolution the field was captured at
   paletteIndex: number;
+  material?: number;   // 0 = sumi, 1 = watercolor (absent on pre-material entries → 0)
   timestamp: number;
 }
 
@@ -163,7 +164,12 @@ export function loadGallery(): GalleryEntry[] {
 // Encode + persist the current painting. Returns false if it was too empty to
 // keep or if storage rejected it. On quota errors we drop the oldest entries
 // and retry so a big dense painting can't wedge the whole gallery.
-export function captureToGallery(field: Float32Array, size: number, paletteIndex: number): boolean {
+export function captureToGallery(
+  field: Float32Array,
+  size: number,
+  paletteIndex: number,
+  material: number = 0,
+): boolean {
   if (coverage(field) < MIN_COVERAGE) return false;
 
   let png: string;
@@ -173,7 +179,7 @@ export function captureToGallery(field: Float32Array, size: number, paletteIndex
     return false;
   }
 
-  const entry: GalleryEntry = { png, size, paletteIndex, timestamp: Date.now() };
+  const entry: GalleryEntry = { png, size, paletteIndex, material, timestamp: Date.now() };
   let entries = capEntries([entry, ...loadGallery()]);
 
   while (entries.length > 0) {

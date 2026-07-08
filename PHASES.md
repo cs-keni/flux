@@ -181,7 +181,11 @@ No paper layer. Dye displayed raw to verify sim correctness.
 - [x] Deploy/hosting: https://flux-indol-gamma.vercel.app/ (Vercel, auto-deploys on push to main)
 - [ ] WebGPU upgrade: compute shaders for 50+ Jacobi iterations
   - Abstract solver behind `GpuBackend` interface now (TODOS.md item)
-- [ ] "Watercolor" material mode: lighter, more transparent, different feather curve
+- [x] "Watercolor" material mode (W key): transparent washes, softer feather, wet-edge rim
+  - `u_material` uniform (0=sumi, 1=watercolor) in render.frag.glsl; signature wet-edge rim (band-pass on concentration), granulation, stronger secondary bleed
+  - Material crossfades (~400ms) like the palette, mirrors palette state in FluidSim
+  - Persists everywhere: share hash `&m=1`, gallery entry `material` field, export renders current
+  - Verified via browse: sumi↔watercolor visually distinct (rim visible), hash + gallery round-trip material
 - [x] Gallery: last 5 paintings in localStorage — G key overlay, live restore
   - Stores the dye R field packed into PNG alpha (~30KB each, sparse ink compresses well)
   - Same PNG is both restore data AND CSS-mask thumbnail (tinted with saved palette)

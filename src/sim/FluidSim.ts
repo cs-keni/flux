@@ -79,6 +79,12 @@ export class FluidSim {
   private targetPrimary    = new Float32Array(3);
   private targetSecondary  = new Float32Array(3);
 
+  // Material crossfade — 0 = sumi ink, 1 = watercolor. currentMaterial lerps
+  // toward targetMaterial each step() so toggling W crossfades the look.
+  private materialIndex = 0;
+  private currentMaterial = 0;
+  private targetMaterial = 0;
+
   constructor(gl: WebGL2RenderingContext, config: SimConfig, mobile: boolean) {
     this.gl = gl;
     // Copy: config may be a shared module-level tier template (HIGH/MID/LOW).
@@ -104,6 +110,10 @@ export class FluidSim {
     this.currentSecondary.set(initPal.secondary);
     this.targetPrimary.set(initPal.primary);
     this.targetSecondary.set(initPal.secondary);
+
+    // Settle material transition (handles context restore correctly)
+    this.currentMaterial = this.materialIndex;
+    this.targetMaterial = this.materialIndex;
 
     this.fboManager = new FBOManager(gl);
     this.buildFBOs();
@@ -169,6 +179,10 @@ export class FluidSim {
       this.currentSecondary[i] += (this.targetSecondary[i] - this.currentSecondary[i]) * palAlpha;
     }
 
+    // Material crossfade: slightly faster (~95% in 0.4s) so the medium shift feels crisp
+    const matAlpha = 1.0 - Math.exp(-8.0 * elapsedSec);
+    this.currentMaterial += (this.targetMaterial - this.currentMaterial) * matAlpha;
+
     gl.bindVertexArray(this.quadVAO);
     gl.viewport(0, 0, resolution, resolution);
 
@@ -227,6 +241,7 @@ export class FluidSim {
     gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkPrimary'), this.currentPrimary);
     gl.uniform3fv(gl.getUniformLocation(this.renderProgram, 'u_inkSecondary'), this.currentSecondary);
     gl.uniform1f(gl.getUniformLocation(this.renderProgram, 'u_idleTime'), idleSeconds);
+    gl.uniform1f(gl.getUniformLocation(this.renderProgram, 'u_material'), this.currentMaterial);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
     gl.bindVertexArray(null);
@@ -265,6 +280,21 @@ export class FluidSim {
 
   getPaletteIndex(): number {
     return this.paletteIndex;
+  }
+
+  // Material: 0 = sumi ink, 1 = watercolor. setMaterial redirects the target;
+  // currentMaterial keeps chasing it in step(), so toggling is crossfade-safe.
+  setMaterial(index: number): void {
+    this.materialIndex = index === 1 ? 1 : 0;
+    this.targetMaterial = this.materialIndex;
+  }
+
+  toggleMaterial(): void {
+    this.setMaterial(this.materialIndex === 0 ? 1 : 0);
+  }
+
+  getMaterialIndex(): number {
+    return this.materialIndex;
   }
 
   getResolution(): number {
@@ -426,6 +456,7 @@ export class FluidSim {
     off.uniform3fv(off.getUniformLocation(prog, 'u_inkPrimary'), palette.primary);
     off.uniform3fv(off.getUniformLocation(prog, 'u_inkSecondary'), palette.secondary);
     off.uniform1f(off.getUniformLocation(prog, 'u_idleTime'), 0.0); // export always looks fresh
+    off.uniform1f(off.getUniformLocation(prog, 'u_material'), this.targetMaterial); // settled material
     off.drawArrays(off.TRIANGLE_STRIP, 0, 4);
 
     return offCanvas.toDataURL('image/png');
