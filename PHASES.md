@@ -179,8 +179,7 @@ No paper layer. Dye displayed raw to verify sim correctness.
 
 - [x] Additional palettes: Vermilion (key 4), Pine (key 5), Prussian Blue (key 6)
 - [x] Deploy/hosting: https://flux-indol-gamma.vercel.app/ (Vercel, auto-deploys on push to main)
-- [ ] WebGPU upgrade: compute shaders for 50+ Jacobi iterations
-  - Abstract solver behind `GpuBackend` interface now (TODOS.md item)
+- [ ] WebGPU upgrade → moved to **Phase 6** (spike-gated). See below and `docs/PHASE6_WEBGPU_SPIKE.md`.
 - [x] "Watercolor" material mode (W key): transparent washes, softer feather, wet-edge rim
   - `u_material` uniform (0=sumi, 1=watercolor) in render.frag.glsl; signature wet-edge rim (band-pass on concentration), granulation, stronger secondary bleed
   - Material crossfades (~400ms) like the palette, mirrors palette state in FluidSim
@@ -203,6 +202,28 @@ No paper layer. Dye displayed raw to verify sim correctness.
   - `TIERS` ladder + `lowerTierFor()` in config.ts; one-way, floors at LOW (256)
   - `FluidSim.rebuildAt()` rebuilds FBOs; painting preserved across the rebuild (resampled)
   - Verified via DEV-only `__fluxForceDowngrade` hook (tree-shaken from prod): 512→256 kept the stroke
+
+---
+
+## Phase 6 — WebGPU Upgrade (spike-gated)
+
+**Not started. Gated behind a throwaway perf spike — do not begin the migration
+until the spike greenlights.** Full spec: `docs/PHASE6_WEBGPU_SPIKE.md`.
+Locked by `/plan-eng-review` 2026-07-08 (eng review + Codex outside voice).
+
+Rationale: already 60fps at 768² → a raw speedup is invisible; WebGPU's compute
+edge is smallest for a grid Eulerian solver on small textures; Firefox still
+flags WebGPU so WebGL2 is a permanent 2nd backend (shaders authored twice).
+Spike de-risks a multi-week migration for ~1 day.
+
+- [ ] **T1** — Profile the current WebGL2 frame per-pass (`EXT_disjoint_timer_query`) to find the real bottleneck. If pressure isn't dominant, re-aim or reconsider.
+- [ ] **T2** — WebGPU compute: **correct global Jacobi** (same equation as WebGL2). Tiled block-Jacobi only behind a residual + pixel-diff equivalence check (reuse SIM_HEADLESS pixelmatch).
+- [ ] **T3** — Benchmark harness: GPU timers both backends + wall-clock fallback; **p95/p99** (not median); 40 iters; deterministic scenes; discard warmup.
+- [ ] **T4** — Multi-device: dev box + ≥1 genuinely weak/mid GPU; randomized/interleaved A/B, fixed power.
+- [ ] **T5** — Outcome-based go/no-go with margin: greenlight only if a weak device gains a tier at p95 < ~14ms (LOW→MID@60, or MID→1024²@60). Else no-go. Write decision doc.
+- [ ] **T6** — Hard timebox + required-artifacts list so the spike can't sprawl.
+
+If greenlit: P6.1 `GpuBackend` (thin) + `WebGL2Backend` + async boot, zero behavior change → P6.2 WGSL port + `WebGPUBackend`, WebGL2 permanent fallback → P6.3 async readback (gallery/export) → P6.4 validation + flip default.
 
 ---
 

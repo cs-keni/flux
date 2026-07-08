@@ -75,7 +75,11 @@ All Phase 3 deliverables shipped (minus the two explicitly deferred to Phase 4):
 
 ### Next Phase 5 candidates
 - [ ] Sound reactivity: mic → auto-pilot speed / injection force (needs mic-permission UX)
-- [ ] WebGPU upgrade (large, Phase 6)
+
+### Phase 6 — WebGPU (planned 2026-07-08, spike-gated, NOT started)
+- Locked via `/plan-eng-review`. Full spec: `docs/PHASE6_WEBGPU_SPIKE.md`; tasks in `PHASES.md` Phase 6.
+- **Do not migrate until the spike greenlights.** Spike order: T1 profile WebGL2 per-pass → T2 correct global-Jacobi WebGPU (tiled only if equivalence-checked) → T3 p95/p99 harness → T4 multi-device A/B → T5 outcome-based go/no-go (weak device gains a tier at p95 < ~14ms).
+- Go/no-go is outcome-based, not a raw multiplier: already 60fps at 768², so a speedup is invisible unless it buys resolution or reaches weaker hardware.
 
 ### Keyboard shortcuts (current)
 1–6 palette · P cycle · R reset(+gallery capture) · S save PNG · C copy link · G gallery · W watercolor · A auto-pilot · F fps(dev)

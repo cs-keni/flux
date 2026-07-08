@@ -1,5 +1,25 @@
 # Engineering Log
 
+## 2026-07-08
+
+### Phase 6 — WebGPU upgrade scoped as a spike-gated effort (planning only, no code)
+
+**Files changed:** `docs/PHASE6_WEBGPU_SPIKE.md` (new), `PHASES.md`, `docs/CURRENT_TASK.md`, `TODOS.md`
+
+Ran `/plan-eng-review` on the WebGPU-upgrade backlog item. Outcome: **do not migrate yet — gate the whole thing behind a throwaway perf spike.** No production code touched this session; this is a locked plan.
+
+**Why gated, not built:** Flux already holds 60fps at 768² on mid GPUs, so a raw GPU speedup under an already-met frame budget is invisible to the user. WebGPU's compute advantage is real but *smallest* for a grid-based Eulerian solver on small textures (the headline wins are for particle-scatter sims). Firefox still flags WebGPU, so `WebGL2Backend` would be a **permanent** second backend (every shader authored twice). Uncertain payoff + high ongoing cost = spike first.
+
+**The spike (locked design, ~1 day, hard timebox):** T1 profile the current WebGL2 frame per-pass with `EXT_disjoint_timer_query` to find the *real* bottleneck before assuming it's Jacobi → T2 implement a **correct global-Jacobi** WebGPU compute pass (same equation as WebGL2), with tiled block-Jacobi allowed only behind a residual + pixel-diff equivalence check → T3 harness with GPU timers + wall-clock fallback, p95/p99 (not median), 40 production iterations, deterministic scenes → T4 run on dev box + ≥1 weak/mid GPU, randomized A/B → T5 outcome-based go/no-go (greenlight only if a weak device gains a resolution tier at p95 < ~14ms, else spend the token on sound reactivity).
+
+**Two cross-model corrections from the Codex outside voice (both would have bitten):**
+1. My initial "shared-memory tiled, multiple iterations per dispatch" recommendation is **not the same solver** — you can't sync workgroups within a dispatch, so it degrades to block-Jacobi with stale halos, changing convergence AND the ink look. Benchmarking it vs WebGL2 global Jacobi would report a fast number for a sim that paints differently. Fixed: correct global Jacobi is the baseline; tiling must pass an equivalence check.
+2. "Measure the full 9-pass frame" is unrepresentable without porting the whole pipeline (hybrid GL+WebGPU interop skews it), and pressure may not even be the bottleneck. Fixed: profile WebGL2 first (T1), then benchmark the dominant pass in isolation.
+
+**Eng review result:** 5 issues found + 2 cross-model tensions, all resolved. 0 unresolved, 0 critical gaps (the tiled-Jacobi silent-false-win gap was caught and closed). Verdict CLEARED. No commit hash for code — planning only; this doc set is the deliverable.
+
+---
+
 ## 2026-07-07
 
 ### Phase 5 — watercolor material mode (W key)
