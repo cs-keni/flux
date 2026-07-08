@@ -81,7 +81,9 @@ export class FluidSim {
 
   constructor(gl: WebGL2RenderingContext, config: SimConfig, mobile: boolean) {
     this.gl = gl;
-    this.config = config;
+    // Copy: config may be a shared module-level tier template (HIGH/MID/LOW).
+    // Runtime downgrade mutates resolution/jacobi, so we must not touch the original.
+    this.config = { ...config };
     this.mobile = mobile;
   }
 
@@ -263,6 +265,21 @@ export class FluidSim {
 
   getPaletteIndex(): number {
     return this.paletteIndex;
+  }
+
+  getResolution(): number {
+    return this.config.resolution;
+  }
+
+  // Rebuild all sim FBOs at a new resolution + Jacobi count (GPU tier downgrade).
+  // Programs and the quad VAO are resolution-independent and left intact. The
+  // caller owns preserving the dye field around this call (readDyeField before,
+  // restoreDyeField after) — rebuilding starts from cleared buffers.
+  rebuildAt(resolution: number, jacobiIterations: number): void {
+    this.fboManager.destroyAll();
+    this.config.resolution = resolution;
+    this.config.jacobiIterations = jacobiIterations;
+    this.buildFBOs();
   }
 
   // ── Gallery: read / restore the ink-concentration (dye) field ─────────────

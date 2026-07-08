@@ -29,6 +29,13 @@ export function initDevOverlay(config: { resolution: number; jacobiIterations: n
   });
 }
 
+// Reflect a runtime tier change in the FPS overlay's res/jacobi labels.
+export function updateDevConfig(resolution: number, jacobiIterations: number): void {
+  if (!fpsEl) return;
+  fpsEl.dataset['res'] = String(resolution);
+  fpsEl.dataset['jacobi'] = String(jacobiIterations);
+}
+
 export function tickFPS(now: number): void {
   if (!fpsVisible || !fpsEl) return;
   frameTimes.push(now);

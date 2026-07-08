@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { getConfig, isMobile } from '../../src/sim/config';
+import { getConfig, isMobile, lowerTierFor, TIERS } from '../../src/sim/config';
 
 function stubScreen(width: number): void {
   Object.defineProperty(window.screen, 'width', { value: width, configurable: true, writable: true });
@@ -70,5 +70,29 @@ describe('getConfig()', () => {
     const cfg = getConfig();
     expect(cfg.dt).toBeCloseTo(1 / 60);
     expect(cfg.frameCapMs).toBe(100);
+  });
+});
+
+describe('lowerTierFor()', () => {
+  it('TIERS is ordered high → low by resolution', () => {
+    expect(TIERS.map((t) => t.resolution)).toEqual([768, 512, 256]);
+  });
+
+  it('steps HIGH → MID → LOW', () => {
+    expect(lowerTierFor(768)?.resolution).toBe(512);
+    expect(lowerTierFor(512)?.resolution).toBe(256);
+  });
+
+  it('returns null at the floor (LOW cannot downgrade)', () => {
+    expect(lowerTierFor(256)).toBeNull();
+  });
+
+  it('returns null for an unknown resolution', () => {
+    expect(lowerTierFor(1024)).toBeNull();
+  });
+
+  it('the next tier carries its own matching jacobi count', () => {
+    expect(lowerTierFor(512)?.jacobiIterations).toBe(20); // LOW
+    expect(lowerTierFor(768)?.jacobiIterations).toBe(40); // MID
   });
 });

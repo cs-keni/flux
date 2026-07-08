@@ -59,7 +59,14 @@ All Phase 3 deliverables shipped (minus the two explicitly deferred to Phase 4):
 - [x] Captures on R (before clear) + pagehide; blanks skipped below MIN_COVERAGE
 - Verified end-to-end via browse: paint → R (capture+clear) → G (overlay) → 1 (live restore)
 
-### Next Phase 5 candidates (from checkpoint backlog)
-- [ ] Dynamic resolution downgrade on jank (monitor frame time, drop tier)
-- [ ] Watercolor material mode (shader-only)
+### Just completed: Dynamic resolution downgrade
+- [x] `PerfMonitor` (src/sim/perfMonitor.ts) — 90-frame avg > 22ms → downgrade; outlier + warmup guards (7 tests)
+- [x] `TIERS` ladder + `lowerTierFor()` in config.ts (5 tests); one-way, floors at LOW
+- [x] `FluidSim.rebuildAt()` + `getResolution()`; config copied in ctor (tier objects stay pristine)
+- [x] main.ts rAF loop feeds raw frame delta; downgrade preserves painting (resample)
+- Verified via DEV `__fluxForceDowngrade` (tree-shaken from prod): 512→256 kept the stroke, floored at 256
+
+### Next Phase 5 candidates
+- [ ] Watercolor material mode (shader-only: lighter feather, more transparent, different FBM)
+- [ ] Sound reactivity: mic → auto-pilot speed / injection force
 - [ ] WebGPU upgrade (large, Phase 6)

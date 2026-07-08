@@ -194,7 +194,11 @@ No paper layer. Dye displayed raw to verify sim correctness.
   - `C` key copies `location.href` to clipboard (flash "link copied.")
   - Pure module `src/share/shareLink.ts` + 14 unit tests
 - [ ] Sound reactivity: mic input → auto-pilot speed or injection force
-- [ ] Dynamic resolution downgrade: monitor frame time, drop tier if avg > 20ms
+- [x] Dynamic resolution downgrade: monitor frame time, drop tier on sustained jank
+  - `PerfMonitor` (src/sim/perfMonitor.ts): 90-frame avg > 22ms → downgrade; skips outliers + warmup
+  - `TIERS` ladder + `lowerTierFor()` in config.ts; one-way, floors at LOW (256)
+  - `FluidSim.rebuildAt()` rebuilds FBOs; painting preserved across the rebuild (resampled)
+  - Verified via DEV-only `__fluxForceDowngrade` hook (tree-shaken from prod): 512→256 kept the stroke
 
 ---
 

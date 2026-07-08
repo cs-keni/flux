@@ -1,5 +1,6 @@
-import { getConfig, isMobile } from './sim/config';
-import { initDevOverlay, tickFPS } from './dev/DevOverlay';
+import { getConfig, isMobile, lowerTierFor, SimConfig } from './sim/config';
+import { initDevOverlay, tickFPS, updateDevConfig } from './dev/DevOverlay';
+import { PerfMonitor } from './sim/perfMonitor';
 import { isHeadless, REPLAY_SEQUENCE, REPLAY_TOTAL_FRAMES } from './sim/headless';
 import { SEQUENCES, getAutoPilotSplat, AutoPilotSequence } from './autopilot/sequences';
 import { HintOverlay } from './ui/HintOverlay';
@@ -152,9 +153,9 @@ async function init(): Promise<void> {
     closeGallery();
     try {
       const field = await decodeEntry(entry);
-      const restored = resampleField(field, entry.size, config.resolution);
+      const restored = resampleField(field, entry.size, sim.getResolution());
       stopAutoPilot();
-      sim.restoreDyeField(restored, config.resolution);
+      sim.restoreDyeField(restored, sim.getResolution());
       applyPalette(entry.paletteIndex);
       lastInputTime = performance.now();
       hint.onInput();
@@ -186,6 +187,29 @@ async function init(): Promise<void> {
   function captureCurrent(): void {
     const { data, size } = sim.readDyeField();
     captureToGallery(data, size, sim.getPaletteIndex());
+  }
+
+  // ── Adaptive resolution ─────────────────────────────────────────────────
+  // Drop a GPU tier on sustained jank so weak devices stay smooth. Preserves
+  // the painting across the FBO rebuild (resampled to the new resolution).
+  const perfMon = new PerfMonitor();
+
+  function downgradeTier(lower: SimConfig): void {
+    const { data, size } = sim.readDyeField();
+    const rescaled = resampleField(data, size, lower.resolution);
+    sim.rebuildAt(lower.resolution, lower.jacobiIterations);
+    sim.restoreDyeField(rescaled, lower.resolution);
+    perfMon.reset();
+    if (import.meta.env.DEV) updateDevConfig(lower.resolution, lower.jacobiIterations);
+  }
+
+  // DEV-only hook to exercise the rebuild path without inducing real jank.
+  if (import.meta.env.DEV) {
+    (window as unknown as { __fluxForceDowngrade?: () => number }).__fluxForceDowngrade = () => {
+      const lower = lowerTierFor(sim.getResolution());
+      if (lower) downgradeTier(lower);
+      return sim.getResolution();
+    };
   }
 
   let pendingResize = false;
@@ -344,8 +368,16 @@ async function init(): Promise<void> {
       }
     }
 
-    const elapsed = Math.min(now - lastTime, 100);
+    const rawDt = now - lastTime;
+    const elapsed = Math.min(rawDt, 100);
     lastTime = now;
+
+    // Adaptive resolution: drop a tier on sustained jank (one-way, floors at LOW).
+    if (perfMon.overBudget(rawDt)) {
+      const lower = lowerTierFor(sim.getResolution());
+      if (lower) downgradeTier(lower);
+    }
+
     sim.step(elapsed);
     sim.render((now - lastInputTime) / 1000);
     if (import.meta.env.DEV) tickFPS(now);

@@ -2,6 +2,28 @@
 
 ## 2026-07-07
 
+### Phase 5 — dynamic resolution downgrade (adaptive tier on jank)
+
+**Files changed:** `src/sim/perfMonitor.ts` (new), `src/sim/config.ts`, `src/sim/FluidSim.ts`, `src/main.ts`, `src/dev/DevOverlay.ts`, `tests/unit/perfMonitor.test.ts` (new), `tests/unit/config.test.ts`
+
+Weak GPUs now stay smooth: on sustained jank the sim drops a resolution tier (HIGH 768 → MID 512 → LOW 256) instead of grinding.
+
+**`PerfMonitor`** (`src/sim/perfMonitor.ts`) — the "when" decision, pure and unit-tested. Averages a 90-frame window and reports over-budget when the mean exceeds 22ms (~45fps). Skips outlier deltas (>100ms: tab switches, stalls) and a 45-frame warmup, so a single GC pause or refocus can't trigger a downgrade. Verdict clears the window; `reset()` restarts warmup after a downgrade.
+
+**Tier ladder** (`config.ts`) — `TIERS = [HIGH, MID, LOW]` + `lowerTierFor(resolution)` returns the next tier down or null at the floor. Matched by resolution so it reads off a FluidSim's live config.
+
+**`FluidSim.rebuildAt(resolution, jacobi)`** — the "how". Destroys + rebuilds only the FBOs (programs and the quad VAO are resolution-independent); updates the sim's config. The caller preserves the painting around it: `readDyeField()` → `resampleField()` to the new size → `rebuildAt()` → `restoreDyeField()`.
+
+**Shared-object trap fixed.** `getConfig()` returns the module-level `HIGH`/`MID`/`LOW` templates. Mutating `config.resolution` in place would corrupt the tier ladder (two tiers reading the same resolution). Fix: `FluidSim` now copies config in its constructor (`{ ...config }`) and owns resolution via `getResolution()`. `main` switched its gallery-restore resample target from `config.resolution` to `sim.getResolution()` so it stays correct after a downgrade.
+
+**Wiring** (`main.ts`) — the rAF loop feeds raw frame delta (pre-100ms-cap) to `PerfMonitor`; over-budget + a lower tier exists → `downgradeTier()`. One-way, floors at LOW, no oscillation. `DevOverlay.updateDevConfig()` refreshes the FPS overlay's res/jacobi labels on downgrade.
+
+**Verification.** Real jank is hard to induce in headless (rAF ~4fps → every delta is an outlier, correctly ignored), so a DEV-only `window.__fluxForceDowngrade()` hook exercises the rebuild path. Confirmed tree-shaken from the prod bundle (`grep dist/` finds nothing). Via `browse`: painted an arch stroke on a MID (512) device → forced downgrade returned 256 → the stroke was preserved (resampled, slightly softer, still live/paintable) → further forces stayed at 256 (floor), no console errors.
+
+**Verified:** type-check clean, 58 unit tests pass (12 new: 7 PerfMonitor + 5 tier-ladder), build clean.
+
+---
+
 ### Phase 5 — gallery (last 5 paintings, localStorage, live restore)
 
 **Files changed:** `src/gallery/gallery.ts` (new), `src/ui/GalleryOverlay.ts` (new), `src/sim/FluidSim.ts`, `src/main.ts`, `src/ui/ShortcutOverlay.ts`, `tests/unit/gallery.test.ts` (new)

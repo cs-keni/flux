@@ -105,3 +105,16 @@ export function getConfig(gl?: WebGL2RenderingContext): SimConfig {
   const tier = gpuTier(gl);
   return tier === 'high' ? HIGH : tier === 'low' ? LOW : MID;
 }
+
+// ── Dynamic tier ladder (runtime downgrade on sustained jank) ───────────────
+// Ordered high → low. Consumers must treat these as read-only templates and
+// never mutate them (FluidSim copies config for exactly this reason).
+export const TIERS: readonly SimConfig[] = [HIGH, MID, LOW];
+
+// The next-lower tier below a given resolution, or null if already at the floor.
+// Matched by resolution so it works off a FluidSim's live (possibly copied) config.
+export function lowerTierFor(resolution: number): SimConfig | null {
+  const i = TIERS.findIndex((t) => t.resolution === resolution);
+  if (i < 0 || i >= TIERS.length - 1) return null;
+  return TIERS[i + 1];
+}
