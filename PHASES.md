@@ -229,11 +229,11 @@ with pixels (2048² export ≈ 7× → a visible freeze). Fixable in WebGL2, no 
 
 ### Phase 6b — WebGL2 async readback (PBO) — the actual deliverable
 
-- [ ] **Async gallery/export readback** — `readPixels` into a `PIXEL_PACK_BUFFER` + `fenceSync`, poll `clientWaitSync(…, 0)` across frames, `getBufferSubData` when signaled. Removes the export/gallery-capture freeze.
-  - [ ] R-key gallery capture → async (no visible hitch mid-paint).
-  - [ ] PNG export (`exportHighRes`, 2048²) → async (the biggest stall).
-  - [ ] **`pagehide` capture stays synchronous** — page is unloading, no time to poll a fence. Keep the sync path for that one caller.
-  - [ ] Verify the fix with the `readback` CPU sampler (`__fluxProfile()` before/after).
+- [~] **Async gallery/export readback** — `readPixels` into a `PIXEL_PACK_BUFFER` + `fenceSync`, poll `clientWaitSync(…, 0)` across frames, `getBufferSubData` when signaled. Removes the export/gallery-capture freeze.
+  - [x] R-key gallery capture → async (`FluidSim.readDyeFieldAsync()` + `main.ts captureCurrentAsync()`). No visible hitch mid-paint. **Design settled (decision `26928a9f`, revised `flux-6b-scratch`):** direct PBO read enqueued before `reset()` — no scratch FBO. GL runs commands in submission order, so the read captures pre-clear pixels; `reset()` only clears (never deletes) the dye texture, so a scratch copy buys nothing.
+  - [ ] PNG export (`exportHighRes`, 2048²) → async — **deferred within 6b.** Not a correctness issue (export clears nothing); its bigger cost is the offscreen render + PNG encode, which can't be async. Separate follow-on.
+  - [x] **`pagehide` capture stays synchronous** — page is unloading, no time to poll a fence. `captureCurrent()` (sync) unchanged; `downgradeTier` + `__fluxSetRes` also stay sync.
+  - [ ] Verify the fix with the `readback` CPU sampler (`__fluxProfile()` before/after) — native Windows Chrome.
   - [ ] Remove spike instrumentation (`GpuProfiler`, `__fluxSetRes`) once verified.
 
 ---

@@ -78,6 +78,9 @@ export class FluidSim {
   // call site is `this.profiler?.…`, so it costs one null-check when unattached.
   private profiler: GpuProfiler | null = null;
 
+  // Phase 6b: guards against overlapping async captures (one PBO read at a time).
+  private captureInFlight = false;
+
   // Palette crossfade — current values lerp toward target each step()
   private currentPrimary   = new Float32Array(3);
   private currentSecondary = new Float32Array(3);
@@ -369,6 +372,82 @@ export class FluidSim {
     const data = new Float32Array(resolution * resolution);
     for (let i = 0; i < data.length; i++) data[i] = rgba[i * 4];
     return { data, size: resolution };
+  }
+
+  // Phase 6b: async dye readback via PBO + fence — no CPU stall on the calling
+  // frame. Sync readPixels blocks until the GPU drains (the R-key / export
+  // hitch, ~5.7ms @768² and worse at higher res). Here we issue the read into a
+  // PIXEL_PACK_BUFFER, drop a fenceSync, and resolve the CPU copy on a later
+  // tick via getBufferSubData once the fence signals.
+  //
+  // Capture-then-clear correctness: callers (R key) enqueue this read, then call
+  // reset() synchronously right after. GL executes in submission order, so the
+  // readPixels-into-PBO runs BEFORE reset()'s clears — the PBO holds pre-clear
+  // pixels no matter how many frames later the CPU maps it. No scratch copy is
+  // needed because reset() only clears the dye FBO; it never deletes the texture.
+  async readDyeFieldAsync(): Promise<{ data: Float32Array; size: number }> {
+    const gl = this.gl;
+    const { resolution } = this.config;
+
+    // One capture at a time. A second R press while a read is pending falls back
+    // to the sync path (rare — R also resets, so mashing just re-clears).
+    if (this.captureInFlight) return this.readDyeField();
+    this.captureInFlight = true;
+
+    const byteLength = resolution * resolution * 4 * 4; // RGBA × float32
+    const pbo = gl.createBuffer()!;
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+    gl.bufferData(gl.PIXEL_PACK_BUFFER, byteLength, gl.STREAM_READ);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.dye.read.framebuffer);
+    // With a PIXEL_PACK_BUFFER bound, the final arg is a byte offset into that
+    // buffer, not a CPU array — this returns immediately instead of stalling.
+    gl.readPixels(0, 0, resolution, resolution, gl.RGBA, gl.FLOAT, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+
+    const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0)!;
+    gl.flush(); // push the fence into the GPU queue so it can eventually signal
+
+    await this.awaitSync(sync);
+
+    const rgba = new Float32Array(resolution * resolution * 4);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+    gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, rgba);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+
+    gl.deleteSync(sync);
+    gl.deleteBuffer(pbo);
+    this.captureInFlight = false;
+
+    const data = new Float32Array(resolution * resolution);
+    for (let i = 0; i < data.length; i++) data[i] = rgba[i * 4];
+    return { data, size: resolution };
+  }
+
+  // Poll a fence off the main thread: clientWaitSync(sync, 0, 0) does a
+  // non-blocking check, re-polled each frame until signaled. Resolves (rather
+  // than looping forever) on WAIT_FAILED or after a ~3s cap so a lost fence
+  // can't wedge captures — worst case the readback yields whatever's in the PBO.
+  private awaitSync(sync: WebGLSync): Promise<void> {
+    const gl = this.gl;
+    return new Promise((resolve) => {
+      let tries = 0;
+      const poll = () => {
+        const status = gl.clientWaitSync(sync, 0, 0);
+        if (
+          status === gl.ALREADY_SIGNALED ||
+          status === gl.CONDITION_SATISFIED ||
+          status === gl.WAIT_FAILED ||
+          ++tries > 180
+        ) {
+          resolve();
+          return;
+        }
+        requestAnimationFrame(poll);
+      };
+      requestAnimationFrame(poll);
+    });
   }
 
   // Restore an ink-concentration field into the dye FBO. `field` must already

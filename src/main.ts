@@ -191,6 +191,17 @@ async function init(): Promise<void> {
     captureToGallery(data, size, sim.getPaletteIndex(), sim.getMaterialIndex());
   }
 
+  // Phase 6b: async variant for the R-key path. Enqueues a non-blocking PBO read
+  // (no readback stall on the keypress frame), then archives when the fence
+  // resolves a few frames later. The caller must enqueue this BEFORE sim.reset()
+  // so the read captures pre-clear pixels (GL runs commands in submission order).
+  // pagehide stays on the sync captureCurrent() — the page is leaving, so there
+  // is no later frame to resolve on.
+  async function captureCurrentAsync(): Promise<void> {
+    const { data, size } = await sim.readDyeFieldAsync();
+    captureToGallery(data, size, sim.getPaletteIndex(), sim.getMaterialIndex());
+  }
+
   // ── Adaptive resolution ─────────────────────────────────────────────────
   // Drop a GPU tier on sustained jank so weak devices stay smooth. Preserves
   // the painting across the FBO rebuild (resampled to the new resolution).
@@ -321,7 +332,10 @@ async function init(): Promise<void> {
     if (e.key === '6') applyPalette(5);
     if (e.key === 'p' || e.key === 'P') cyclePalette();
     if (e.key === 'r' || e.key === 'R') {
-      captureCurrent();  // archive what's on the canvas before clearing it
+      // Enqueue the async read first (non-blocking), THEN clear. The read is
+      // submitted before reset()'s clears, so it captures the pre-clear canvas
+      // while the keypress stays instant. Floating promise is intentional.
+      void captureCurrentAsync();
       stopAutoPilot();
       sim.reset();
       hint.onInput();

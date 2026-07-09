@@ -1,5 +1,22 @@
 # Engineering Log
 
+## 2026-07-09
+
+### Phase 6b — R-key gallery capture → async PBO readback (no more capture hitch)
+
+**Commit:** `7039fbd` (not yet pushed — holding for runtime verification on a native GL device before it auto-deploys to prod).
+**Files changed:** `src/sim/FluidSim.ts`, `src/main.ts`, `PHASES.md`, `docs/CURRENT_TASK.md`, `docs/ENGINEERING_LOG.md`
+
+Implemented the first half of Phase 6b: the R-key gallery capture no longer stalls the frame on `readPixels`. Added `FluidSim.readDyeFieldAsync()` — `readPixels` into a `PIXEL_PACK_BUFFER` (byte-offset form, returns immediately), `fenceSync` + `flush`, then a `requestAnimationFrame`-driven `clientWaitSync(sync,0,0)` poll (`awaitSync`) that resolves on signal / `WAIT_FAILED` / a ~180-frame cap, then `getBufferSubData` and R-channel extract. A `captureInFlight` guard serializes captures and falls back to sync `readDyeField()` if one is already pending. `main.ts` gained `captureCurrentAsync()`; the R-key handler now `void captureCurrentAsync()` **before** `sim.reset()`.
+
+**Design decision (`26928a9f`, revised via `flux-6b-scratch`): dropped the scratch FBO from the locked fork #2.** The checkpoint assumed async readback returns pixels "after the clear" so you need a synchronous blit to a scratch copy. That conflates *when the CPU maps the PBO* with *when the GPU reads the source*. GL executes in submission order: the `readPixels`→PBO is enqueued before `reset()`'s clears, so the PBO holds pre-clear pixels regardless of when `getBufferSubData` resolves. `reset()` only clears the dye FBO (verified — never deletes the texture), so there's no dangling-texture risk either. Result: same behavior, one fewer FBO + blit, less code.
+
+**Kept sync (unchanged):** `captureCurrent()` for `pagehide` (page unloading, can't poll a fence), `downgradeTier`, and DEV `__fluxSetRes`.
+
+**Deferred within 6b:** `exportHighRes` async — not a correctness issue (export clears nothing) and its dominant cost is the 2048² offscreen render + PNG encode, which can't go async. Separate follow-on. Spike instrumentation (`GpuProfiler`, `__fluxSetRes`) stays until the hitch drop is verified via `__fluxProfile()` in native Windows Chrome.
+
+**Verify:** `npm run type-check` clean · 64 unit tests pass · `npm run build` clean. Runtime `readback`-sampler before/after still pending (needs native GL device).
+
 ## 2026-07-08
 
 ### Phase 6 T5 — spike concluded: NO-GO on WebGPU, salvage PBO async readback

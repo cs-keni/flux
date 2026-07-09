@@ -1,6 +1,22 @@
 # Current Task
 
-## Status: Phase 6 spike COMPLETE (NO-GO) — Phase 6b (PBO async readback) next
+## Status: Phase 6b IN PROGRESS — R-key async readback done; export deferred, verification + instrument removal pending
+
+### Done (2026-07-09): R-key gallery capture → async PBO readback
+
+`FluidSim.readDyeFieldAsync()` (PBO + `fenceSync` + `clientWaitSync` poll) + `main.ts captureCurrentAsync()`; R-key enqueues the async read before `sim.reset()`. No capture-frame stall. **Design settled:** direct PBO read, no scratch FBO (GL submission order protects the pre-clear pixels; `reset()` only clears). Decision `26928a9f`. `type-check` clean · 64 tests pass · `build` clean.
+
+### Remaining in 6b
+
+- [ ] Verify the readback stall drops via `__fluxProfile()` `readback` sampler (before/after) in **native Windows Chrome**.
+- [ ] `exportHighRes` async — deferred follow-on (not correctness; render+PNG-encode dominates, can't go async).
+- [ ] Remove spike instrumentation (`GpuProfiler`, `__fluxSetRes`, the `readback` sampling in `readDyeField`) once verified.
+
+Then: sound reactivity (mic → auto-pilot / injection).
+
+---
+
+## (Prior) Status: Phase 6 spike COMPLETE (NO-GO) — Phase 6b (PBO async readback) next
 
 ### Done: Phase 6 WebGPU spike → NO-GO
 
