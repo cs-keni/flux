@@ -216,7 +216,10 @@ edge is smallest for a grid Eulerian solver on small textures; Firefox still
 flags WebGPU so WebGL2 is a permanent 2nd backend (shaders authored twice).
 Spike de-risks a multi-week migration for ~1 day.
 
-- [ ] **T1** — Profile the current WebGL2 frame per-pass (`EXT_disjoint_timer_query`) to find the real bottleneck. If pressure isn't dominant, re-aim or reconsider.
+- [~] **T1** — Profile the current WebGL2 frame per-pass (`EXT_disjoint_timer_query`) to find the real bottleneck. If pressure isn't dominant, re-aim or reconsider.
+  - [x] Instrument built: `src/dev/GpuProfiler.ts` (per-pass `TIME_ELAPSED`, async ring-buffer, disjoint-aware, p50/p95/p99), wired into `FluidSim` via `attachProfiler()`, DEV-only hooks `window.__fluxProfile()` / `__fluxProfileReset()`. Tree-shaken from prod.
+  - [x] Piggybacked readback measurement: `readDyeField()` sync `readPixels` = **5.7ms** stall at 768² (~⅓ of a frame). Early signal that async readback (P6.3), not Jacobi, may be the real payoff.
+  - [ ] **Run `__fluxProfile()` on a native-GL device** for the actual per-pass split — WSL2/ANGLE disables timer queries (`supported:false` here), so this box can't produce the numbers.
 - [ ] **T2** — WebGPU compute: **correct global Jacobi** (same equation as WebGL2). Tiled block-Jacobi only behind a residual + pixel-diff equivalence check (reuse SIM_HEADLESS pixelmatch).
 - [ ] **T3** — Benchmark harness: GPU timers both backends + wall-clock fallback; **p95/p99** (not median); 40 iters; deterministic scenes; discard warmup.
 - [ ] **T4** — Multi-device: dev box + ≥1 genuinely weak/mid GPU; randomized/interleaved A/B, fixed power.

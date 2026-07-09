@@ -1,8 +1,18 @@
 # Current Task
 
-## Status: Phase 4 COMPLETE — Phase 5 in progress
+## Status: Phase 5 COMPLETE — Phase 6 spike in progress (T1)
 
-### What just completed
+### Active: Phase 6 WebGPU spike — T1 profiling
+
+**Done this session:** Built the T1 instrument — `src/dev/GpuProfiler.ts`, a DEV-only per-pass GPU timer (`EXT_disjoint_timer_query_webgl2`, async ring-buffer, disjoint-aware, p50/p95/p99). Wired into `FluidSim` via `attachProfiler()` with null-guarded `begin/end` brackets around all 9 pass groups; dev hooks `window.__fluxProfile()` / `__fluxProfileReset()`. Tree-shaken from prod. Piggybacked the readback TODO: `readDyeField()` sync `readPixels` measured at **5.7ms** on WSL2 (~⅓ frame).
+
+**Next concrete step:** Run `window.__fluxProfile()` in a DEV build **on a native-GL machine** to get the actual per-pass split. This WSL2/ANGLE box returns `supported:false` (timer queries disabled), so it cannot produce the per-pass numbers that decide whether pressure actually dominates. Do NOT start T2 (WebGPU compute) until T1's numbers are in.
+
+Verify: `npm run type-check` clean · 64 unit tests pass · `npm run build` clean.
+
+---
+
+### (Prior) What completed in Phase 4
 
 All Phase 3 deliverables shipped (minus the two explicitly deferred to Phase 4):
 

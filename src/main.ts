@@ -214,6 +214,49 @@ async function init(): Promise<void> {
     };
   }
 
+  // DEV-only (Phase 6 T1): attach the per-pass GPU profiler and expose hooks.
+  // `__fluxProfile()` prints a per-pass GPU breakdown (mean/p50/p95/p99) so we
+  // can see where the frame budget actually goes before assuming it's Jacobi.
+  // `__fluxProfileReset()` clears the rolling window (call after a scene change).
+  if (import.meta.env.DEV) {
+    const { GpuProfiler } = await import('./dev/GpuProfiler');
+    const profiler = new GpuProfiler(gl);
+    sim.attachProfiler(profiler);
+    const w = window as unknown as {
+      __fluxProfile?: () => unknown;
+      __fluxProfileReset?: () => void;
+    };
+    w.__fluxProfile = () => {
+      const r = profiler.report();
+      if (!r.supported) {
+        console.warn(
+          '[flux] GPU timer queries unavailable (EXT_disjoint_timer_query_webgl2 ' +
+          'disabled — common on WSL2/ANGLE and weak GPUs). Only CPU readback ' +
+          'samples below; run T1 profiling on a native GL device.',
+        );
+      }
+      const fmt = (rows: typeof r.gpu) =>
+        rows.map((p) => ({
+          pass: p.label,
+          n: p.n,
+          'mean ms': +p.mean.toFixed(3),
+          'p50 ms': +p.p50.toFixed(3),
+          'p95 ms': +p.p95.toFixed(3),
+          'p99 ms': +p.p99.toFixed(3),
+        }));
+      if (r.gpu.length) {
+        console.log(`[flux] GPU per-pass (frame total ≈ ${r.gpuTotalMean.toFixed(2)}ms):`);
+        console.table(fmt(r.gpu));
+      }
+      if (r.cpu.length) {
+        console.log('[flux] CPU wall-clock (sync readback stalls):');
+        console.table(fmt(r.cpu));
+      }
+      return r;
+    };
+    w.__fluxProfileReset = () => profiler.reset();
+  }
+
   let pendingResize = false;
   window.addEventListener('resize', () => { pendingResize = true; });
 

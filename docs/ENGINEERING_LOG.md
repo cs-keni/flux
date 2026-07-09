@@ -2,6 +2,23 @@
 
 ## 2026-07-08
 
+### Phase 6 T1 — per-pass GPU profiler (spike instrumentation, DEV-only)
+
+**Files changed:** `src/dev/GpuProfiler.ts` (new), `src/sim/FluidSim.ts`, `src/main.ts`, `docs/CURRENT_TASK.md`, `PHASES.md`, `TODOS.md`
+
+Started the spike at T1: built the instrument that answers "where does the frame budget actually go" before anyone assumes it's the Jacobi pressure solve (Codex's core objection).
+
+**What:** `GpuProfiler` wraps `EXT_disjoint_timer_query_webgl2` (`TIME_ELAPSED`) to measure real GPU time per pass group, not CPU-side GL-call time. Ring-buffered async readback (4-frame latency so polling never stalls the pipe — the exact stall we're hunting), disjoint-aware (bad batches discarded), rolling 300-sample window, reports mean/p50/p95/p99. `FluidSim` gained `attachProfiler()` and null-guarded `p?.begin(label)/p?.end()` brackets around all 9 pass groups (pressure's 40 iterations timed as one bucket — the number T1 tests). Attached only under `import.meta.env.DEV`, so the class + all extension queries are tree-shaken from prod (verified: `GpuProfiler`/`GPU_DISJOINT` = 0 occurrences in `dist/`). Dev hooks: `window.__fluxProfile()` console.tables the breakdown, `__fluxProfileReset()` clears the window.
+
+**Piggybacked the readback TODO:** `readDyeField()` now wall-clock-times its sync `readPixels` into a `readback` CPU sample (gated on profiler presence, zero prod cost).
+
+**Verified via browse on this WSL2 box:**
+- Timer queries return `false` here (ANGLE disables `EXT_disjoint_timer_query_webgl2`) — exactly the documented WSL2 gotcha. Profiler's `supported:false` path handled it gracefully with an honest console warning. **Actual per-pass GPU numbers require a native-GL device — that is T4's job, this box cannot answer the gate.**
+- CPU readback sampler works: one `readPixels` at 768² stalled **5.7ms** — roughly a third of a 16.6ms frame budget from a single sync readback. Chromium also logged `GL Driver Message … GPU stall due to ReadPixels`. This is strong early evidence that async readback (P6.3), not the Jacobi solve, may be the real user-visible WebGPU payoff.
+- `npm run type-check` clean · 64 unit tests pass · `npm run build` clean.
+
+Still open in T1: run `__fluxProfile()` on a native-GL machine to get the per-pass split that decides whether pressure actually dominates.
+
 ### Phase 6 — WebGPU upgrade scoped as a spike-gated effort (planning only, no code)
 
 **Files changed:** `docs/PHASE6_WEBGPU_SPIKE.md` (new), `PHASES.md`, `docs/CURRENT_TASK.md`, `TODOS.md`

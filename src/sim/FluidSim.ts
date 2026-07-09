@@ -22,6 +22,7 @@
 import { SimConfig, PALETTES } from './config';
 import { FBOManager, PingPong, FBO } from './FBOManager';
 import { createProgram } from './glUtils';
+import type { GpuProfiler } from '../dev/GpuProfiler';
 
 import quadVert from '../shaders/quad.vert.glsl';
 import splatFrag from '../shaders/splat.frag.glsl';
@@ -72,6 +73,10 @@ export class FluidSim {
   private paused: boolean = false;
   private pendingSplats: SplatEvent[] = [];
   private paletteIndex: number = 0;
+
+  // DEV-only per-pass GPU profiler (Phase 6 T1). Null in production — every
+  // call site is `this.profiler?.…`, so it costs one null-check when unattached.
+  private profiler: GpuProfiler | null = null;
 
   // Palette crossfade — current values lerp toward target each step()
   private currentPrimary   = new Float32Array(3);
@@ -161,9 +166,17 @@ export class FluidSim {
     this.pendingSplats.push(event);
   }
 
+  // DEV-only (Phase 6 T1): attach a per-pass GPU timer. No-op in prod builds
+  // because main.ts only calls this under import.meta.env.DEV.
+  attachProfiler(profiler: GpuProfiler): void {
+    this.profiler = profiler;
+  }
+
   step(elapsed: number): void {
     if (this.paused) return;
     const gl = this.gl;
+    const p = this.profiler;
+    p?.frameStart();
     const { resolution, jacobiIterations, diffuseIterations, viscosity, splatRadius, force, dt, frameCapMs } = this.config;
 
     // Normalize dissipation to be frame-rate-independent: express elapsed as
@@ -187,50 +200,69 @@ export class FluidSim {
     gl.viewport(0, 0, resolution, resolution);
 
     // 1. Splat
+    p?.begin('splat');
     for (const s of this.pendingSplats) {
       this.runSplat(s, s.radius ?? splatRadius, force);
     }
     this.pendingSplats = [];
+    p?.end();
 
     // 2. Advect velocity
+    p?.begin('advect-vel');
     this.runAdvect(this.velocity, this.velocity.read, dt, dissipation);
+    p?.end();
 
     // 3. Diffuse velocity
+    p?.begin('diffuse');
     if (viscosity > 0) {
       for (let i = 0; i < diffuseIterations; i++) {
         this.runDiffuse(this.velocity, viscosity, dt);
       }
     }
+    p?.end();
 
     // 4. Divergence
+    p?.begin('divergence');
     this.runDivergence();
+    p?.end();
 
-    // 5. Pressure solve (Jacobi)
+    // 5. Pressure solve (Jacobi) — the pass everyone assumes dominates. Timed as
+    // one bucket across all iterations; that total is the number T1 tests.
+    p?.begin('pressure');
     this.clearPressure();
     const iters = this.mobile ? Math.floor(jacobiIterations / 2) : jacobiIterations;
     for (let i = 0; i < iters; i++) {
       this.runPressure();
     }
+    p?.end();
 
     // 6. Gradient subtract
+    p?.begin('gradient');
     this.runGradient();
+    p?.end();
 
     // 7. Boundary
+    p?.begin('boundary');
     this.runBoundary();
+    p?.end();
 
     // 8. Advect dye
+    p?.begin('advect-dye');
     this.runAdvect(this.dye, this.velocity.read, dt, dissipation);
+    p?.end();
 
     gl.bindVertexArray(null);
   }
 
   render(idleSeconds: number = 0): void {
     const gl = this.gl;
+    const p = this.profiler;
 
     gl.bindVertexArray(this.quadVAO);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
+    p?.begin('render');
     gl.useProgram(this.renderProgram);
     gl.uniform1i(gl.getUniformLocation(this.renderProgram, 'u_dye'), 0);
     gl.uniform1i(gl.getUniformLocation(this.renderProgram, 'u_velocity'), 1);
@@ -243,8 +275,11 @@ export class FluidSim {
     gl.uniform1f(gl.getUniformLocation(this.renderProgram, 'u_idleTime'), idleSeconds);
     gl.uniform1f(gl.getUniformLocation(this.renderProgram, 'u_material'), this.currentMaterial);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    p?.end();
 
     gl.bindVertexArray(null);
+    // render() closes the frame: step() opened it with frameStart().
+    p?.frameEnd();
   }
 
   reset(): void {
@@ -323,7 +358,12 @@ export class FluidSim {
     const { resolution } = this.config;
     const rgba = new Float32Array(resolution * resolution * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.dye.read.framebuffer);
+    // Phase 6 T1 / TODOS.md: measure the sync readback stall. readPixels blocks
+    // until the GPU drains, so wall-clock here is the user-visible cost that an
+    // async mapAsync path (WebGPU) would hide. This is the candidate real payoff.
+    const t0 = this.profiler ? performance.now() : 0;
     gl.readPixels(0, 0, resolution, resolution, gl.RGBA, gl.FLOAT, rgba);
+    this.profiler?.sampleCpu('readback', performance.now() - t0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     const data = new Float32Array(resolution * resolution);
