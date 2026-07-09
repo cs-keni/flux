@@ -1,14 +1,22 @@
 # Current Task
 
-## Status: Phase 5 COMPLETE — Phase 6 spike in progress (T1)
+## Status: Phase 6 spike COMPLETE (NO-GO) — Phase 6b (PBO async readback) next
 
-### Active: Phase 6 WebGPU spike — T1 profiling
+### Done: Phase 6 WebGPU spike → NO-GO
 
-**Done this session:** Built the T1 instrument — `src/dev/GpuProfiler.ts`, a DEV-only per-pass GPU timer (`EXT_disjoint_timer_query_webgl2`, async ring-buffer, disjoint-aware, p50/p95/p99). Wired into `FluidSim` via `attachProfiler()` with null-guarded `begin/end` brackets around all 9 pass groups; dev hooks `window.__fluxProfile()` / `__fluxProfileReset()`. Tree-shaken from prod. Piggybacked the readback TODO: `readDyeField()` sync `readPixels` measured at **5.7ms** on WSL2 (~⅓ frame).
+Built the T1 profiler (`src/dev/GpuProfiler.ts`, DEV-only), ran per-pass profiling + a resolution sweep on the native dev box. Result: solver dominates the GPU slice (pressure 57–75%) but the whole frame is ~1.5–3ms of a 16.6ms budget even at 2048²; scaling is sublinear (7.1× pixels → 1.5× time). **T5 call: NO-GO on WebGPU** — invisible speedup, permanent 2nd backend, no weak device to test the real gate. Decision doc: `docs/PHASE6_T5_DECISION.md`; data: `docs/PHASE6_T1_RESULTS.md`.
 
-**Next concrete step:** Run `window.__fluxProfile()` in a DEV build **on a native-GL machine** to get the actual per-pass split. This WSL2/ANGLE box returns `supported:false` (timer queries disabled), so it cannot produce the per-pass numbers that decide whether pressure actually dominates. Do NOT start T2 (WebGPU compute) until T1's numbers are in.
+### Active/next: Phase 6b — WebGL2 PBO async readback
 
-Verify: `npm run type-check` clean · 64 unit tests pass · `npm run build` clean.
+The one real user-visible cost is the sync `readPixels` freeze on gallery-capture / PNG export (~5.7ms at 768², worse at 2048²), not the solver. Fix it in WebGL2 with Pixel Buffer Objects + `fenceSync` (async readback) — no WebGPU needed.
+
+**Scope (see PHASES.md Phase 6b):** async R-key gallery capture + `exportHighRes` PNG; **keep `pagehide` capture synchronous** (page unloading, can't poll a fence). Verify the stall drops via the `readback` CPU sampler in `__fluxProfile()`, then remove the spike instrumentation (`GpuProfiler`, `__fluxSetRes`).
+
+**Design fork to confirm before coding:** how to handle capture calls that need the result "now" (R-key clears the canvas right after capturing) vs the async path. See the scope note I'll surface next.
+
+After 6b: sound reactivity (mic → auto-pilot / injection).
+
+Verify baseline: `npm run type-check` clean · 64 unit tests pass · `npm run build` clean.
 
 ---
 

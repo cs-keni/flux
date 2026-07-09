@@ -205,29 +205,36 @@ No paper layer. Dye displayed raw to verify sim correctness.
 
 ---
 
-## Phase 6 — WebGPU Upgrade (spike-gated)
+## Phase 6 — WebGPU Upgrade (spike-gated) → **NO-GO** (spike complete 2026-07-08)
 
-**Not started. Gated behind a throwaway perf spike — do not begin the migration
-until the spike greenlights.** Full spec: `docs/PHASE6_WEBGPU_SPIKE.md`.
-Locked by `/plan-eng-review` 2026-07-08 (eng review + Codex outside voice).
+**Spike ran and concluded NO-GO.** Full decision + numbers:
+`docs/PHASE6_T5_DECISION.md`. Spec: `docs/PHASE6_WEBGPU_SPIKE.md`; profiling data:
+`docs/PHASE6_T1_RESULTS.md`. No production solver code was written (instrumentation
+only) — nothing to revert.
 
-Rationale: already 60fps at 768² → a raw speedup is invisible; WebGPU's compute
-edge is smallest for a grid Eulerian solver on small textures; Firefox still
-flags WebGPU so WebGL2 is a permanent 2nd backend (shaders authored twice).
-Spike de-risks a multi-week migration for ~1 day.
+**Why no-go:** even 2048²×40 Jacobi = ~3ms mean / ~1.4ms median of a 16.6ms budget
+(5× headroom); scaling is wildly sublinear (7.1× pixels → 1.5× time) so this GPU
+is coasting; WebGL2 already holds 1024² trivially; and we have no weak device to
+test the only branch that could greenlight. WebGPU would be a permanent 2nd backend
+(Firefox-flagged) for an invisible speedup. Revisit only if a weak/mid GPU becomes
+available, or a compute-heavy feature changes the calculus.
 
-- [~] **T1** — Profile the current WebGL2 frame per-pass (`EXT_disjoint_timer_query`) to find the real bottleneck. If pressure isn't dominant, re-aim or reconsider.
-  - [x] Instrument built: `src/dev/GpuProfiler.ts` (per-pass `TIME_ELAPSED`, async ring-buffer, disjoint-aware, p50/p95/p99), wired into `FluidSim` via `attachProfiler()`, DEV-only hooks `window.__fluxProfile()` / `__fluxProfileReset()`. Tree-shaken from prod.
-  - [x] Piggybacked readback measurement: `readDyeField()` sync `readPixels` = **5.7ms** stall at 768² (~⅓ of a frame). Early signal that async readback (P6.3), not Jacobi, may be the real payoff.
-  - [x] **Ran `__fluxProfile()` on the native-GL dev box** (`docs/PHASE6_T1_RESULTS.md`): frame GPU ≈ 1.5ms; pressure = 56%, pressure+diffuse = 80% of the GPU slice → solver confirmed as dominant compute. But only ~9% of the 16.6ms budget → ceiling device can't greenlight; the gate is weak-device.
-  - [ ] **Decisive run: `__fluxProfile()` on a genuinely weak/mid GPU** (Intel UHD / old laptop), + a 1024² ceiling run on the dev box. This is what answers T5.
-- [ ] **T2** — WebGPU compute: **correct global Jacobi** (same equation as WebGL2). Tiled block-Jacobi only behind a residual + pixel-diff equivalence check (reuse SIM_HEADLESS pixelmatch).
-- [ ] **T3** — Benchmark harness: GPU timers both backends + wall-clock fallback; **p95/p99** (not median); 40 iters; deterministic scenes; discard warmup.
-- [ ] **T4** — Multi-device: dev box + ≥1 genuinely weak/mid GPU; randomized/interleaved A/B, fixed power.
-- [ ] **T5** — Outcome-based go/no-go with margin: greenlight only if a weak device gains a tier at p95 < ~14ms (LOW→MID@60, or MID→1024²@60). Else no-go. Write decision doc.
-- [ ] **T6** — Hard timebox + required-artifacts list so the spike can't sprawl.
+- [x] **T1** — Profiled WebGL2 frame per-pass (`EXT_disjoint_timer_query`). Instrument `src/dev/GpuProfiler.ts` + hooks `__fluxProfile()` / `__fluxSetRes()` (DEV-only, tree-shaken). Result: solver dominates the compute (pressure 56–75%) but is tiny in absolute terms. See `docs/PHASE6_T1_RESULTS.md`.
+- [x] **T5** — Go/no-go: **NO-GO**, recorded in `docs/PHASE6_T5_DECISION.md`.
+- [n/a] T2–T4, T6 — moot; spike did not greenlight.
 
-If greenlit: P6.1 `GpuBackend` (thin) + `WebGL2Backend` + async boot, zero behavior change → P6.2 WGSL port + `WebGPUBackend`, WebGL2 permanent fallback → P6.3 async readback (gallery/export) → P6.4 validation + flip default.
+**Salvaged finding (the one real user-visible cost, and it isn't the solver):**
+the sync `readPixels` in `FluidSim.readDyeField()` stalls ~5.7ms at 768² and scales
+with pixels (2048² export ≈ 7× → a visible freeze). Fixable in WebGL2, no WebGPU.
+
+### Phase 6b — WebGL2 async readback (PBO) — the actual deliverable
+
+- [ ] **Async gallery/export readback** — `readPixels` into a `PIXEL_PACK_BUFFER` + `fenceSync`, poll `clientWaitSync(…, 0)` across frames, `getBufferSubData` when signaled. Removes the export/gallery-capture freeze.
+  - [ ] R-key gallery capture → async (no visible hitch mid-paint).
+  - [ ] PNG export (`exportHighRes`, 2048²) → async (the biggest stall).
+  - [ ] **`pagehide` capture stays synchronous** — page is unloading, no time to poll a fence. Keep the sync path for that one caller.
+  - [ ] Verify the fix with the `readback` CPU sampler (`__fluxProfile()` before/after).
+  - [ ] Remove spike instrumentation (`GpuProfiler`, `__fluxSetRes`) once verified.
 
 ---
 

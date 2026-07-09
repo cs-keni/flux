@@ -2,6 +2,16 @@
 
 ## 2026-07-08
 
+### Phase 6 T5 — spike concluded: NO-GO on WebGPU, salvage PBO async readback
+
+**Files changed:** `docs/PHASE6_T5_DECISION.md` (new), `PHASES.md`, `docs/ENGINEERING_LOG.md`, `docs/CURRENT_TASK.md`
+
+Ran the resolution sweep (`__fluxSetRes` 768→1024→1536→2048) on the native dev box. Frame GPU: 1.98 / 1.71 / 2.22 / 3.00 ms. **7.1× the pixels bought only ~1.5× the time** — wildly sublinear, so this GPU is coasting on fixed per-dispatch overhead, not throughput. Even 2048²×40 Jacobi = ~3ms mean / ~1.4ms median vs 16.6ms → 5× headroom. Pressure dominates the share (57→75%) but is never expensive. WebGL2 already holds 1024² at 1.7ms.
+
+**T5 call (Kenny): NO-GO on the WebGPU migration.** A raw solver speedup is invisible on capable hardware, the only greenlight branch needs weak silicon we can't source, and WebGPU would be a permanent 2nd backend for nothing. Full numbers + reasoning: `docs/PHASE6_T5_DECISION.md`. T2–T4/T6 moot; no solver code was written, nothing to revert.
+
+**Salvage:** the sync `readPixels` stall (~5.7ms at 768², worse at 2048² export) is the one real user-visible cost — and it's readback, not the solver. It's fixable in WebGL2 via Pixel Buffer Objects + `fenceSync` (async readback), no second backend. New Phase 6b in PHASES.md scopes it: async R-key capture + PNG export, `pagehide` stays sync (page unloading, can't poll a fence). Spike instrumentation kept until the PBO fix is verified via the `readback` sampler, then removed.
+
 ### Phase 6 T1 — dev hooks for resolution-scaling probe
 
 **Files changed:** `src/main.ts`, `docs/ENGINEERING_LOG.md`
