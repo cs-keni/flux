@@ -2,6 +2,16 @@
 
 ## 2026-07-08
 
+### Phase 6 T1 — first per-pass numbers (native-GL dev box)
+
+**Files changed:** `docs/PHASE6_T1_RESULTS.md` (new), `docs/ENGINEERING_LOG.md`, `PHASES.md`
+
+Ran `window.__fluxProfile()` in native Windows Chrome (timer queries `supported: true` there, unlike the WSL2 headless Chromium). Full table in `docs/PHASE6_T1_RESULTS.md`. Headline:
+
+- Frame GPU total ≈ **1.50 ms** (of a 16.6 ms budget → ~9% util). **pressure = 56%** of the GPU slice, **pressure + diffuse (both Jacobi) = ~80%**. So the solver is confirmed as the dominant compute — Codex's "don't assume Jacobi" caveat resolves to "it does dominate," measured.
+- But this is the ceiling device: 1.5 ms leaves ~15 ms headroom, so a raw solver speedup is invisible here. **This box cannot greenlight the migration** — T5's gate is about weak devices.
+- Decision-tree branch: pressure dominates → solver is the spike target IF the gate says go. **Next decisive measurement: same `__fluxProfile()` on a genuinely weak/mid GPU** (Intel UHD / old laptop), plus a 1024² ceiling run. If pressure balloons past ~14 ms there → greenlight T2; if cost is in fullscreen `render` fill-rate or the readback hitch instead → re-aim.
+
 ### Phase 6 T1 — per-pass GPU profiler (spike instrumentation, DEV-only)
 
 **Files changed:** `src/dev/GpuProfiler.ts` (new), `src/sim/FluidSim.ts`, `src/main.ts`, `docs/CURRENT_TASK.md`, `PHASES.md`, `TODOS.md`
