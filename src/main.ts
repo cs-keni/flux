@@ -196,6 +196,11 @@ async function init(): Promise<void> {
   // the painting across the FBO rebuild (resampled to the new resolution).
   const perfMon = new PerfMonitor();
 
+  // Always false in prod; only the DEV-only __fluxSetRes hook sets it, so a
+  // resolution probe (e.g. 1024²) isn't auto-reverted by adaptive downgrade
+  // mid-measurement. One dead boolean in prod — negligible.
+  let suppressAutoDowngrade = false;
+
   function downgradeTier(lower: SimConfig): void {
     const { data, size } = sim.readDyeField();
     const rescaled = resampleField(data, size, lower.resolution);
@@ -225,9 +230,11 @@ async function init(): Promise<void> {
     const w = window as unknown as {
       __fluxProfile?: () => unknown;
       __fluxProfileReset?: () => void;
+      __fluxSetRes?: (n: number) => number;
     };
     w.__fluxProfile = () => {
       const r = profiler.report();
+      const resolution = sim.getResolution();
       if (!r.supported) {
         console.warn(
           '[flux] GPU timer queries unavailable (EXT_disjoint_timer_query_webgl2 ' +
@@ -245,16 +252,33 @@ async function init(): Promise<void> {
           'p99 ms': +p.p99.toFixed(3),
         }));
       if (r.gpu.length) {
-        console.log(`[flux] GPU per-pass (frame total ≈ ${r.gpuTotalMean.toFixed(2)}ms):`);
+        console.log(`[flux] GPU per-pass @ ${resolution}² (frame total ≈ ${r.gpuTotalMean.toFixed(2)}ms):`);
         console.table(fmt(r.gpu));
       }
       if (r.cpu.length) {
-        console.log('[flux] CPU wall-clock (sync readback stalls):');
+        console.log(`[flux] CPU wall-clock @ ${resolution}² (sync readback stalls):`);
         console.table(fmt(r.cpu));
       }
-      return r;
+      return { resolution, ...r };
     };
     w.__fluxProfileReset = () => profiler.reset();
+
+    // __fluxSetRes(n): override the sim resolution at runtime to map the
+    // resolution→frame-time curve (proxy for a heavier GPU load — e.g. probe
+    // whether 1024² holds 60fps). Preserves the painting (read → resample →
+    // rebuild → restore, same path as a tier downgrade) and resets the profiler
+    // window so post-resize samples are clean. Keeps production Jacobi count.
+    w.__fluxSetRes = (n: number) => {
+      suppressAutoDowngrade = true; // hold the probe res; don't auto-revert
+      const { data, size } = sim.readDyeField();
+      const rescaled = resampleField(data, size, n);
+      sim.rebuildAt(n, config.jacobiIterations);
+      sim.restoreDyeField(rescaled, n);
+      perfMon.reset();
+      profiler.reset();
+      updateDevConfig(n, config.jacobiIterations);
+      return sim.getResolution();
+    };
   }
 
   let pendingResize = false;
@@ -424,7 +448,7 @@ async function init(): Promise<void> {
     lastTime = now;
 
     // Adaptive resolution: drop a tier on sustained jank (one-way, floors at LOW).
-    if (perfMon.overBudget(rawDt)) {
+    if (!suppressAutoDowngrade && perfMon.overBudget(rawDt)) {
       const lower = lowerTierFor(sim.getResolution());
       if (lower) downgradeTier(lower);
     }

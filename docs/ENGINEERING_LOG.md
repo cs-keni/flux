@@ -2,6 +2,16 @@
 
 ## 2026-07-08
 
+### Phase 6 T1 — dev hooks for resolution-scaling probe
+
+**Files changed:** `src/main.ts`, `docs/ENGINEERING_LOG.md`
+
+Kenny has no weak GPU handy, so we approximate one greenlight branch by mapping the resolution→frame-time curve on the dev box. Added DEV-only hooks:
+- `window.__fluxSetRes(n)` — overrides sim resolution at runtime (read → resample → `rebuildAt` → restore, preserving the painting; keeps production Jacobi count; resets the profiler window). Sets `suppressAutoDowngrade` so the adaptive-resolution monitor doesn't snap a heavy probe (e.g. 1024²) back mid-measurement.
+- `__fluxProfile()` now labels output with the current resolution (`@ N²`) and includes it in the returned object, so runs at different resolutions are self-identifying.
+
+`suppressAutoDowngrade` is a single always-false boolean in prod (only the DEV hook sets it). Honest caveat recorded for the analysis: raising resolution scales *problem size*, not weak-silicon clocks/bandwidth — it answers "does 1024² stay in budget on this GPU class," not "is an Intel UHD pressure-bound." type-check clean.
+
 ### Phase 6 T1 — first per-pass numbers (native-GL dev box)
 
 **Files changed:** `docs/PHASE6_T1_RESULTS.md` (new), `docs/ENGINEERING_LOG.md`, `PHASES.md`
