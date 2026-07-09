@@ -4,7 +4,7 @@
 
 ### Phase 6b — R-key gallery capture → async PBO readback (no more capture hitch)
 
-**Commit:** `d5b4ef2` (not yet pushed — holding for runtime verification on a native GL device before it auto-deploys to prod).
+**Commit:** `d5b4ef2` (pushed to `main` → Vercel auto-deploy). Runtime verification on a native GL device still pending — measure the `readback` sampler drop on the live deploy before removing spike instrumentation.
 **Files changed:** `src/sim/FluidSim.ts`, `src/main.ts`, `PHASES.md`, `docs/CURRENT_TASK.md`, `docs/ENGINEERING_LOG.md`
 
 Implemented the first half of Phase 6b: the R-key gallery capture no longer stalls the frame on `readPixels`. Added `FluidSim.readDyeFieldAsync()` — `readPixels` into a `PIXEL_PACK_BUFFER` (byte-offset form, returns immediately), `fenceSync` + `flush`, then a `requestAnimationFrame`-driven `clientWaitSync(sync,0,0)` poll (`awaitSync`) that resolves on signal / `WAIT_FAILED` / a ~180-frame cap, then `getBufferSubData` and R-channel extract. A `captureInFlight` guard serializes captures and falls back to sync `readDyeField()` if one is already pending. `main.ts` gained `captureCurrentAsync()`; the R-key handler now `void captureCurrentAsync()` **before** `sim.reset()`.
