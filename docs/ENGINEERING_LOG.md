@@ -4,6 +4,7 @@
 
 ### Phase 6b — remove spike instrumentation (keep the profiler)
 
+**Commit:** `213cabd` (pushed to `main`).
 **Files changed:** `src/main.ts`, `src/sim/FluidSim.ts`, `PHASES.md`, `docs/CURRENT_TASK.md`, `docs/ENGINEERING_LOG.md`
 
 R-key async capture verified hitch-free (Kenny confirmed on the live deploy + native Chrome), so the WebGPU-spike scaffolding came out. Removed `__fluxSetRes` (the resolution-sweep probe), the `suppressAutoDowngrade` flag it drove (adaptive-downgrade guard simplified back to `if (perfMon.overBudget(rawDt))`), and the `readback` CPU sampler in `readDyeField` (it measured the exact sync stall the async path replaced). **Kept `GpuProfiler` + the per-pass `p?.begin/end` hooks + `__fluxProfile()`/`__fluxProfileReset()`** — decision `flux-6b-profiler-keep`: it's a reusable per-pass GPU profiler, DEV-only (dynamic import → tree-shaken from prod) and null-guarded (one null-check per pass in prod), worth keeping for sound-reactivity + export perf work. De-spiked its comments/warning from the T1 framing. `type-check` clean · 64 tests pass · `build` clean (FluidSim bundle 23.97→23.87 kB).
