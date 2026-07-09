@@ -207,11 +207,6 @@ async function init(): Promise<void> {
   // the painting across the FBO rebuild (resampled to the new resolution).
   const perfMon = new PerfMonitor();
 
-  // Always false in prod; only the DEV-only __fluxSetRes hook sets it, so a
-  // resolution probe (e.g. 1024²) isn't auto-reverted by adaptive downgrade
-  // mid-measurement. One dead boolean in prod — negligible.
-  let suppressAutoDowngrade = false;
-
   function downgradeTier(lower: SimConfig): void {
     const { data, size } = sim.readDyeField();
     const rescaled = resampleField(data, size, lower.resolution);
@@ -230,10 +225,10 @@ async function init(): Promise<void> {
     };
   }
 
-  // DEV-only (Phase 6 T1): attach the per-pass GPU profiler and expose hooks.
-  // `__fluxProfile()` prints a per-pass GPU breakdown (mean/p50/p95/p99) so we
-  // can see where the frame budget actually goes before assuming it's Jacobi.
-  // `__fluxProfileReset()` clears the rolling window (call after a scene change).
+  // DEV-only per-pass GPU profiler. `__fluxProfile()` prints a per-pass GPU
+  // breakdown (mean/p50/p95/p99) so we can see where the frame budget actually
+  // goes; `__fluxProfileReset()` clears the rolling window (call after a scene
+  // change). Kept as a standing dev instrument for perf work.
   if (import.meta.env.DEV) {
     const { GpuProfiler } = await import('./dev/GpuProfiler');
     const profiler = new GpuProfiler(gl);
@@ -241,7 +236,6 @@ async function init(): Promise<void> {
     const w = window as unknown as {
       __fluxProfile?: () => unknown;
       __fluxProfileReset?: () => void;
-      __fluxSetRes?: (n: number) => number;
     };
     w.__fluxProfile = () => {
       const r = profiler.report();
@@ -249,8 +243,8 @@ async function init(): Promise<void> {
       if (!r.supported) {
         console.warn(
           '[flux] GPU timer queries unavailable (EXT_disjoint_timer_query_webgl2 ' +
-          'disabled — common on WSL2/ANGLE and weak GPUs). Only CPU readback ' +
-          'samples below; run T1 profiling on a native GL device.',
+          'disabled — common on WSL2/ANGLE and weak GPUs). Run profiling on a ' +
+          'native GL device (e.g. Windows Chrome).',
         );
       }
       const fmt = (rows: typeof r.gpu) =>
@@ -273,23 +267,6 @@ async function init(): Promise<void> {
       return { resolution, ...r };
     };
     w.__fluxProfileReset = () => profiler.reset();
-
-    // __fluxSetRes(n): override the sim resolution at runtime to map the
-    // resolution→frame-time curve (proxy for a heavier GPU load — e.g. probe
-    // whether 1024² holds 60fps). Preserves the painting (read → resample →
-    // rebuild → restore, same path as a tier downgrade) and resets the profiler
-    // window so post-resize samples are clean. Keeps production Jacobi count.
-    w.__fluxSetRes = (n: number) => {
-      suppressAutoDowngrade = true; // hold the probe res; don't auto-revert
-      const { data, size } = sim.readDyeField();
-      const rescaled = resampleField(data, size, n);
-      sim.rebuildAt(n, config.jacobiIterations);
-      sim.restoreDyeField(rescaled, n);
-      perfMon.reset();
-      profiler.reset();
-      updateDevConfig(n, config.jacobiIterations);
-      return sim.getResolution();
-    };
   }
 
   let pendingResize = false;
@@ -462,7 +439,7 @@ async function init(): Promise<void> {
     lastTime = now;
 
     // Adaptive resolution: drop a tier on sustained jank (one-way, floors at LOW).
-    if (!suppressAutoDowngrade && perfMon.overBudget(rawDt)) {
+    if (perfMon.overBudget(rawDt)) {
       const lower = lowerTierFor(sim.getResolution());
       if (lower) downgradeTier(lower);
     }

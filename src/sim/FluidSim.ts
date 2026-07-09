@@ -361,12 +361,11 @@ export class FluidSim {
     const { resolution } = this.config;
     const rgba = new Float32Array(resolution * resolution * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.dye.read.framebuffer);
-    // Phase 6 T1 / TODOS.md: measure the sync readback stall. readPixels blocks
-    // until the GPU drains, so wall-clock here is the user-visible cost that an
-    // async mapAsync path (WebGPU) would hide. This is the candidate real payoff.
-    const t0 = this.profiler ? performance.now() : 0;
+    // Sync path: readPixels blocks until the GPU drains (the readback stall).
+    // Only non-hot callers use it now — pagehide (page unloading), tier
+    // downgrade, context restore. The R-key/interactive path uses
+    // readDyeFieldAsync() (PBO + fence) to avoid the stall.
     gl.readPixels(0, 0, resolution, resolution, gl.RGBA, gl.FLOAT, rgba);
-    this.profiler?.sampleCpu('readback', performance.now() - t0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     const data = new Float32Array(resolution * resolution);

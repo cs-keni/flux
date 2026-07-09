@@ -233,8 +233,8 @@ with pixels (2048² export ≈ 7× → a visible freeze). Fixable in WebGL2, no 
   - [x] R-key gallery capture → async (`FluidSim.readDyeFieldAsync()` + `main.ts captureCurrentAsync()`). No visible hitch mid-paint. **Design settled (decision `26928a9f`, revised `flux-6b-scratch`):** direct PBO read enqueued before `reset()` — no scratch FBO. GL runs commands in submission order, so the read captures pre-clear pixels; `reset()` only clears (never deletes) the dye texture, so a scratch copy buys nothing.
   - [ ] PNG export (`exportHighRes`, 2048²) → async — **deferred within 6b.** Not a correctness issue (export clears nothing); its bigger cost is the offscreen render + PNG encode, which can't be async. Separate follow-on.
   - [x] **`pagehide` capture stays synchronous** — page is unloading, no time to poll a fence. `captureCurrent()` (sync) unchanged; `downgradeTier` + `__fluxSetRes` also stay sync.
-  - [ ] Verify the fix with the `readback` CPU sampler (`__fluxProfile()` before/after) — native Windows Chrome.
-  - [ ] Remove spike instrumentation (`GpuProfiler`, `__fluxSetRes`) once verified.
+  - [x] Verify the fix — R-key capture confirmed hitch-free on the live deploy + native Chrome (2026-07-09).
+  - [x] Remove spike instrumentation — cut `__fluxSetRes`, `suppressAutoDowngrade`, and the `readback` CPU sampler (all tied to the now-closed WebGPU go/no-go). **Kept `GpuProfiler` + per-pass hooks + `__fluxProfile`** as a standing DEV tool (decision `flux-6b-profiler-keep`): tree-shaken from prod, null-guarded, useful for future perf work.
 
 ---
 

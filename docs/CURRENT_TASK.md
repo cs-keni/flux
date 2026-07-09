@@ -6,11 +6,13 @@
 
 `FluidSim.readDyeFieldAsync()` (PBO + `fenceSync` + `clientWaitSync` poll) + `main.ts captureCurrentAsync()`; R-key enqueues the async read before `sim.reset()`. No capture-frame stall. **Design settled:** direct PBO read, no scratch FBO (GL submission order protects the pre-clear pixels; `reset()` only clears). Decision `26928a9f`. `type-check` clean · 64 tests pass · `build` clean.
 
-### Remaining in 6b
+### Done (2026-07-09): verified + spike instrumentation removed
 
-- [ ] Verify the readback stall drops via `__fluxProfile()` `readback` sampler (before/after) in **native Windows Chrome**.
-- [ ] `exportHighRes` async — deferred follow-on (not correctness; render+PNG-encode dominates, can't go async).
-- [ ] Remove spike instrumentation (`GpuProfiler`, `__fluxSetRes`, the `readback` sampling in `readDyeField`) once verified.
+R-key async capture verified hitch-free (live deploy + native Chrome). Removed `__fluxSetRes`, `suppressAutoDowngrade`, and the `readback` CPU sampler. **Kept `GpuProfiler` + `__fluxProfile` / `__fluxProfileReset`** as a standing DEV profiler (decision `flux-6b-profiler-keep`).
+
+### Remaining
+
+- [ ] `exportHighRes` async — deferred follow-on within 6b (not a correctness issue; render+PNG-encode dominates and can't go async). Decide whether to do it or close 6b here.
 
 Then: sound reactivity (mic → auto-pilot / injection).
 
