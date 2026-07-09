@@ -10,11 +10,13 @@
 
 R-key async capture verified hitch-free (live deploy + native Chrome). Removed `__fluxSetRes`, `suppressAutoDowngrade`, and the `readback` CPU sampler. **Kept `GpuProfiler` + `__fluxProfile` / `__fluxProfileReset`** as a standing DEV profiler (decision `flux-6b-profiler-keep`).
 
-### Remaining
+### 6b closed (decision `flux-6b-close`)
 
-- [ ] `exportHighRes` async — deferred follow-on within 6b (not a correctness issue; render+PNG-encode dominates and can't go async). Decide whether to do it or close 6b here.
+Core shipped + verified. Export async parked as a known follow-on (deliberate save action, partial win, needs a worker/OffscreenCanvas encode fix for the real payoff).
 
-Then: sound reactivity (mic → auto-pilot / injection).
+### Next: sound reactivity (Phase 6 line item, mic → auto-pilot / injection)
+
+New feature — in design/clarification before any code. Scope TBD: which audio features drive which sim params, mic-permission UX, on/off + visual feedback, no-mic fallback.
 
 ---
 

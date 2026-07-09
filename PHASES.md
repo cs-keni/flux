@@ -227,11 +227,13 @@ available, or a compute-heavy feature changes the calculus.
 the sync `readPixels` in `FluidSim.readDyeField()` stalls ~5.7ms at 768² and scales
 with pixels (2048² export ≈ 7× → a visible freeze). Fixable in WebGL2, no WebGPU.
 
-### Phase 6b — WebGL2 async readback (PBO) — the actual deliverable
+### Phase 6b — WebGL2 async readback (PBO) — **DONE (core), 2026-07-09**
+
+Core deliverable (the interactive R-key hitch) shipped + verified. Export async parked as a known follow-on (decision `flux-6b-close`): it's a deliberate save action, not the interactive loop, and the async win is only partial (PNG encode stays sync). Revisit if the export freeze becomes a real complaint or a worker/OffscreenCanvas encode fix is on the table.
 
 - [~] **Async gallery/export readback** — `readPixels` into a `PIXEL_PACK_BUFFER` + `fenceSync`, poll `clientWaitSync(…, 0)` across frames, `getBufferSubData` when signaled. Removes the export/gallery-capture freeze.
   - [x] R-key gallery capture → async (`FluidSim.readDyeFieldAsync()` + `main.ts captureCurrentAsync()`). No visible hitch mid-paint. **Design settled (decision `26928a9f`, revised `flux-6b-scratch`):** direct PBO read enqueued before `reset()` — no scratch FBO. GL runs commands in submission order, so the read captures pre-clear pixels; `reset()` only clears (never deletes) the dye texture, so a scratch copy buys nothing.
-  - [ ] PNG export (`exportHighRes`, 2048²) → async — **deferred within 6b.** Not a correctness issue (export clears nothing); its bigger cost is the offscreen render + PNG encode, which can't be async. Separate follow-on.
+  - [ ] PNG export (`exportHighRes`, 2048²) → async — **parked follow-on** (decision `flux-6b-close`). Not a correctness issue (export clears nothing); its dominant cost is the offscreen render + PNG encode, which can't go async without a worker/OffscreenCanvas refactor.
   - [x] **`pagehide` capture stays synchronous** — page is unloading, no time to poll a fence. `captureCurrent()` (sync) unchanged; `downgradeTier` + `__fluxSetRes` also stay sync.
   - [x] Verify the fix — R-key capture confirmed hitch-free on the live deploy + native Chrome (2026-07-09).
   - [x] Remove spike instrumentation — cut `__fluxSetRes`, `suppressAutoDowngrade`, and the `readback` CPU sampler (all tied to the now-closed WebGPU go/no-go). **Kept `GpuProfiler` + per-pass hooks + `__fluxProfile`** as a standing DEV tool (decision `flux-6b-profiler-keep`): tree-shaken from prod, null-guarded, useful for future perf work.
